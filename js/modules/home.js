@@ -181,42 +181,81 @@ window.Modules.home = {
   },
 
   renderStreaks(streaks) {
+    const d = Store.get();
+    Store.ensureStreakHistory();
+    const history = d.meta.streakHistory || { fitness: [], english: [], learning: [], spiritual: [] };
+    const today = Store.todayStr();
+
     const items = [
-      { key: 'fitness', icon: '💪', label: '健身2小时', days: streaks.fitness || 0 },
-      { key: 'english', icon: '🗣', label: '英语30分钟', days: streaks.english || 0 },
-      { key: 'learning', icon: '📚', label: '学习1小时', days: streaks.learning || 0 },
-      { key: 'spiritual', icon: '🙏', label: '灵修', days: streaks.spiritual || 0 },
+      { key: 'fitness', icon: '💪', label: '健身2小时' },
+      { key: 'english', icon: '🗣', label: '英语30分钟' },
+      { key: 'learning', icon: '📚', label: '学习1小时' },
+      { key: 'spiritual', icon: '🙏', label: '灵修' },
     ];
-    return items.map(s => `
-      <div class="streak-item" onclick="Modules.home.toggleStreak('${s.key}')">
+
+    return items.map(s => {
+      const dates = history[s.key] || [];
+      const streak = Store.calcStreak(dates);
+      const checkedToday = dates.includes(today);
+      const isLongStreak = streak >= 7;
+
+      return `
+      <div class="streak-item ${checkedToday ? 'checked-today' : ''}" onclick="Modules.home.toggleStreak('${s.key}')">
         <div class="streak-icon">${s.icon}</div>
         <div class="streak-info">
           <div class="streak-name">${s.label}</div>
-          <div class="streak-days">连续 <b>${s.days}</b> 天</div>
+          <div class="streak-days">
+            连续 <b>${streak}</b> 天
+            ${isLongStreak ? '<span class="streak-fire">🔥</span>' : ''}
+          </div>
+          ${checkedToday ? '<div class="streak-today-badge">今日已完成</div>' : ''}
         </div>
-        <div class="streak-toggle" id="streakToggle_${s.key}">
-          <span>✓ 打卡</span>
+        <div class="streak-toggle ${checkedToday ? 'active' : ''}" id="streakToggle_${s.key}">
+          <span>${checkedToday ? '✓ 已打卡' : '✓ 打卡'}</span>
         </div>
-      </div>
-    `).join('');
+      </div>`;
+    }).join('');
   },
 
   toggleStreak(key) {
+    const today = Store.todayStr();
+    Store.ensureStreakHistory();
+
     Store.update(d => {
-      if (!d.meta.personalStreaks) d.meta.personalStreaks = { fitness: 0, english: 0, learning: 0, spiritual: 0 };
-      const today = Store.todayStr();
-      if (d.meta.lastStreakDate !== today) {
-        // 新的一天，所有streak重置检查
-        d.meta.lastStreakDate = today;
+      const history = d.meta.streakHistory || {};
+      if (!history[key]) history[key] = [];
+      const dates = history[key];
+
+      const idx = dates.indexOf(today);
+      if (idx > -1) {
+        // 取消今日打卡
+        dates.splice(idx, 1);
+      } else {
+        // 今日打卡
+        dates.push(today);
       }
-      d.meta.personalStreaks[key] = (d.meta.personalStreaks[key] || 0) + 1;
+
+      // 重新计算连续天数
+      const streak = Store.calcStreak(dates);
+      if (!d.meta.personalStreaks) d.meta.personalStreaks = {};
+      d.meta.personalStreaks[key] = streak;
+      d.meta.streakHistory = history;
     });
+
+    // 刷新 UI
     const d = Store.get();
     const streaks = d.meta.personalStreaks || { fitness: 0, english: 0, learning: 0, spiritual: 0 };
     document.getElementById('streakGrid').innerHTML = this.renderStreaks(streaks);
-    // 更新侧边栏 streak
     App.renderStreak();
-    UI.toast('打卡成功！连续坚持中 💪');
+
+    const history = d.meta.streakHistory || {};
+    const checkedToday = (history[key] || []).includes(today);
+    if (checkedToday) {
+      const streak = streaks[key] || 0;
+      UI.toast(`打卡成功！连续 ${streak} 天坚持中 💪`);
+    } else {
+      UI.toast('已取消今日打卡');
+    }
   },
 
   renderDailyReport() {
