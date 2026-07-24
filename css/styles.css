@@ -1193,6 +1193,32 @@ ul { list-style: none; }
   transition: all 0.2s ease;
 }
 .streak-item:hover .streak-toggle { background: var(--gold-glow); color: var(--gold-deep); }
+.streak-item.checked-today { border-color: var(--green); background: rgba(91,140,106,0.03); }
+.streak-toggle.active { background: var(--green); color: #fff !important; }
+.streak-today-badge {
+  font-size: 10px;
+  color: var(--green);
+  font-weight: 500;
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.streak-today-badge::before {
+  content: '';
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+}
+.streak-fire {
+  display: inline-block;
+  margin-left: 2px;
+  animation: firePulse 1s ease-in-out infinite alternate;
+}
+@keyframes firePulse {
+  0% { transform: scale(1); }
+  100% { transform: scale(1.2); }
+}
 
 /* CEO 日报卡片 */
 .ceo-report-card {
