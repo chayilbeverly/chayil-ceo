@@ -7,7 +7,7 @@
 const Supa = (function () {
   // ========== 配置 ==========
   const SUPABASE_URL = 'https://sbujvbzqrnqfrtfeggk.supabase.co';
-  const SUPABASE_ANON_KEY = 'sb_publishable_JH0Ld3SybhVSjwuzKkACOA_WhVp7H77';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNidWp2amJ6cXJucWZydGZlZ2drIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ4NzMzOTcsImV4cCI6MjEwMDQ0OTM5N30.Ut5We6VJ-MnNA1iH-w5bW7hhkj5TfuO6J2ThrK41hk0';
 
   let client = null;
   let currentUser = null;
