@@ -59,6 +59,10 @@
         <div class="streak-num" id="sidebarStreak">0</div>
         <div class="streak-label">连续完成天数</div>
       </div>
+      <div class="sync-indicator" id="syncIndicator" title="点击手动同步">
+        <span class="sync-dot" id="syncDot"></span>
+        <span class="sync-text" id="syncText">未配置同步</span>
+      </div>
     </div>
   </aside>
 
@@ -71,6 +75,9 @@
         <span class="page-date" id="pageDate"></span>
       </div>
       <div class="topbar-right">
+        <button class="btn btn-ghost" id="syncSetupBtn" title="配置云端同步">
+          <span class="btn-ico">☁</span> 同步
+        </button>
         <button class="btn btn-ghost" id="ceoReportBtn">
           <span class="btn-ico">☀</span> CEO 日报
         </button>
@@ -98,7 +105,39 @@
   </div>
 </div>
 
+<!-- 同步配置弹窗 -->
+<div class="modal-overlay" id="syncModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div>
+        <div class="modal-eyebrow">☁ 云端同步设置</div>
+        <h2 class="modal-title">多设备数据同步</h2>
+      </div>
+      <button class="modal-close" id="syncModalClose">×</button>
+    </div>
+    <div class="modal-body">
+      <p style="margin-bottom:16px;color:var(--ink-500);font-size:13px;line-height:1.6">
+        设置 GitHub 同步后，手机上的操作会自动同步到电脑，电脑上的操作也会同步到手机。<br>
+        需要创建一个 GitHub Personal Access Token。
+      </p>
+      <div class="form-group">
+        <label class="form-label">GitHub Personal Access Token</label>
+        <input type="password" class="input" id="syncTokenInput" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
+        <div class="form-hint">
+          <a href="https://github.com/settings/tokens/new?scopes=repo&description=Chayil%20CEO%20Sync" target="_blank" style="color:var(--gold-deep);text-decoration:underline;">点此创建 Token →</a>
+          勾选 <b>repo</b> 权限，生成后粘贴到上方。
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:16px;">
+        <button class="btn btn-primary" id="syncSaveBtn">💾 保存并启用同步</button>
+        <button class="btn btn-ghost" id="syncDisableBtn">断开同步</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="js/sync.js"></script>
 <script src="js/store.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/modules/home.js"></script>
