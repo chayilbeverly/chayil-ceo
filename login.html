@@ -365,13 +365,15 @@
       }
     } catch (e) {
       console.error('[注册异常]', e);
+      // 直接显示 Supabase 返回的真实错误
       var msg = (e && e.message) || String(e) || '注册失败';
-      if (msg.indexOf('Failed to fetch') > -1 || msg.indexOf('NetworkError') > -1) {
-        msg = '网络连接失败，请确认 Supabase 项目状态正常后刷新重试（错误已输出到控制台）';
-      } else if (msg.indexOf('already registered') > -1 || msg.indexOf('already exists') > -1) {
+      // 友好化常用错误
+      if (msg.indexOf('already registered') > -1 || msg.indexOf('already exists') > -1) {
         msg = '该邮箱已注册，请直接登录';
       } else if (msg.indexOf('signups not allowed') > -1 || msg.indexOf('disabled') > -1) {
-        msg = '注册功能已关闭，请联系管理员';
+        msg = '注册功能已关闭，请在 Supabase Auth Settings 中开启';
+      } else if (msg.indexOf('Email rate limit') > -1) {
+        msg = '请求太频繁，请稍后再试';
       }
       showError(msg);
     } finally {

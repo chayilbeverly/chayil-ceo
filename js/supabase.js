@@ -42,20 +42,47 @@ const Supa = (function () {
   async function signUp(email, password) {
     const sb = getClient();
     if (!sb) throw new Error('Supabase 未配置');
-    const { data, error } = await sb.auth.signUp({ email, password });
-    if (error) throw error;
-    if (data.user) { currentUser = data.user; session = data.session; }
-    return data;
+
+    try {
+      const { data, error } = await sb.auth.signUp({ email, password });
+      if (error) {
+        // Supabase 业务错误（如邮箱已注册、注册关闭等）
+        console.error('[signUp] Supabase 拒绝:', error);
+        throw new Error(error.message || error.status || '注册请求被拒绝');
+      }
+      if (data.user) { currentUser = data.user; session = data.session; }
+      return data;
+    } catch (e) {
+      // 区分网络错误 vs 业务错误
+      console.error('[signUp] 完整异常:', e);
+      if (e.message && e.message.indexOf('Failed to fetch') === -1) {
+        // 已有具体消息，直接抛出
+        throw e;
+      }
+      // 网络异常：尝试诊断
+      var detail = '网络请求失败（' + SUPABASE_URL + '/auth/v1/signup）';
+      if (e.name) detail += ' | name=' + e.name;
+      if (e.cause) detail += ' | cause=' + JSON.stringify(e.cause);
+      throw new Error(detail);
+    }
   }
 
   async function signIn(email, password) {
     const sb = getClient();
     if (!sb) throw new Error('Supabase 未配置');
-    const { data, error } = await sb.auth.signInWithPassword({ email, password });
-    if (error) throw error;
-    currentUser = data.user;
-    session = data.session;
-    return data;
+    try {
+      const { data, error } = await sb.auth.signInWithPassword({ email, password });
+      if (error) {
+        console.error('[signIn] Supabase 拒绝:', error);
+        throw new Error(error.message || '登录失败');
+      }
+      currentUser = data.user;
+      session = data.session;
+      return data;
+    } catch (e) {
+      console.error('[signIn] 完整异常:', e);
+      throw e;
+    }
   }
 
   async function signOut() {
