@@ -1,6 +1,6 @@
 /* ============================================
-   Chayil CEO OS — Main App v3
-   路由 / 导航 / CEO 日报
+   Chayil CEO OS — Main App v3.1
+   路由 / 导航 / CEO 日报 / 云端同步
    ============================================ */
 
 const App = {
@@ -17,8 +17,12 @@ const App = {
     'assets': { title: '我的资产库', module: 'assets' },
   },
 
-  init() {
-    Store.load();
+  async init() {
+    // 云端同步初始化
+    await this.initSync();
+
+    await Store.load();
+
     // 预填充灵感与爆款数据
     Store.update(data => {
       if ((!data.inspirations || !data.inspirations.length) && typeof INSPIRATION_SEED !== 'undefined') {
@@ -28,17 +32,154 @@ const App = {
         data.radar = RADAR_SEED.map(s => ({ id: Store.uid(), ...s, date: Store.todayStr(), bookmarked: false, emotionPoint: s.emotionPoint || '', myAdaptation: s.myAdaptation || '' }));
       }
     });
+
     this.bindNav();
     this.renderDate();
     this.renderStreak();
+    this.renderSyncStatus();
     this.route(this.current);
 
-    document.getElementById('ceoReportBtn').addEventListener('click', () => this.openCeoModal());
+    // 同步状态监听
+    Sync.onChange(() => this.renderSyncStatus());
 
+    document.getElementById('ceoReportBtn').addEventListener('click', () => this.openCeoModal());
     document.getElementById('ceoModal').addEventListener('click', e => {
       if (e.target.id === 'ceoModal') this.closeCeoModal();
     });
+
+    // 同步按钮
+    document.getElementById('syncSetupBtn').addEventListener('click', () => this.openSyncModal());
+    document.getElementById('syncModal').addEventListener('click', e => {
+      if (e.target.id === 'syncModal') this.closeSyncModal();
+    });
+    document.getElementById('syncModalClose').addEventListener('click', () => this.closeSyncModal());
+    document.getElementById('syncSaveBtn').addEventListener('click', () => this.saveSyncToken());
+    document.getElementById('syncDisableBtn').addEventListener('click', () => this.disableSync());
+
+    // 侧边栏同步指示器点击手动同步
+    document.getElementById('syncIndicator').addEventListener('click', () => {
+      if (Sync.hasToken()) {
+        Store.syncNow().then(() => this.renderSyncStatus());
+      } else {
+        this.openSyncModal();
+      }
+    });
+
+    // 定期自动同步（每 60 秒检查一次云端更新）
+    setInterval(() => this.autoSyncCheck(), 60000);
   },
+
+  // === 云端同步 ===
+
+  async initSync() {
+    // 读取已保存的 token
+    const savedToken = Sync.getToken();
+    if (savedToken) {
+      // 静默尝试拉取云端数据
+      try {
+        const remote = await Sync.pull();
+        if (remote && remote._syncVersion) {
+          // 临时存储，等 Store.load 时对比
+          this._remoteData = remote;
+        }
+      } catch (e) {
+        console.log('初始化同步跳过:', e.message);
+      }
+    }
+  },
+
+  renderSyncStatus() {
+    const dot = document.getElementById('syncDot');
+    const text = document.getElementById('syncText');
+    if (!dot || !text) return;
+
+    const status = Sync.getStatus();
+    const hasToken = Sync.hasToken();
+    const lastSync = Sync.getLastSync();
+
+    dot.className = 'sync-dot';
+    if (!hasToken) {
+      dot.classList.add('sync-off');
+      text.textContent = '未配置同步';
+    } else if (status === 'pulling' || status === 'pushing') {
+      dot.classList.add('sync-spin');
+      text.textContent = status === 'pulling' ? '拉取中...' : '保存中...';
+    } else if (status === 'ok') {
+      dot.classList.add('sync-on');
+      const time = lastSync ? this.formatSyncTime(lastSync) : '';
+      text.textContent = time ? '已同步 ' + time : '已同步';
+    } else if (status === 'error') {
+      dot.classList.add('sync-off');
+      text.textContent = '同步失败';
+    } else {
+      dot.classList.add('sync-on');
+      text.textContent = '本地模式';
+    }
+  },
+
+  formatSyncTime(iso) {
+    const d = new Date(iso);
+    const now = new Date();
+    const diff = Math.floor((now - d) / 1000);
+    if (diff < 60) return '刚刚';
+    if (diff < 3600) return Math.floor(diff / 60) + '分钟前';
+    if (diff < 86400) return Math.floor(diff / 3600) + '小时前';
+    return d.getMonth() + 1 + '/' + d.getDate() + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  },
+
+  openSyncModal() {
+    document.getElementById('syncTokenInput').value = Sync.getToken() || '';
+    document.getElementById('syncModal').classList.add('show');
+  },
+
+  closeSyncModal() {
+    document.getElementById('syncModal').classList.remove('show');
+  },
+
+  saveSyncToken() {
+    const token = document.getElementById('syncTokenInput').value.trim();
+    if (!token) return;
+
+    Sync.setToken(token);
+    this.closeSyncModal();
+
+    // 立即推送当前数据到云端
+    Store.syncNow().then(() => {
+      this.renderSyncStatus();
+      console.log('✅ 同步已启用，数据已推送');
+    });
+  },
+
+  disableSync() {
+    if (confirm('确定断开云端同步？本地数据不会丢失。')) {
+      localStorage.removeItem('chayil_gh_token');
+      this.closeSyncModal();
+      this.renderSyncStatus();
+    }
+  },
+
+  async autoSyncCheck() {
+    if (!Sync.hasToken()) return;
+    try {
+      const remote = await Sync.pull();
+      if (remote && remote._syncVersion) {
+        const localVer = Store.get()._syncVersion || 0;
+        if (remote._syncVersion > localVer) {
+          // 云端有更新，重新加载
+          const data = Store.get();
+          Object.assign(data, remote);
+          data._syncVersion = remote._syncVersion;
+          Store.saveLocal();
+          this.renderSyncStatus();
+          // 刷新当前视图
+          this.route(this.current);
+          console.log('🔄 自动同步：云端数据已更新');
+        }
+      }
+    } catch (e) { /* 静默 */ }
+  },
+
+  // === 路由 ===
 
   bindNav() {
     document.querySelectorAll('.nav-item').forEach(item => {
@@ -77,6 +218,8 @@ const App = {
     const max = Math.max(streaks.fitness || 0, streaks.english || 0, streaks.learning || 0, streaks.spiritual || 0);
     document.getElementById('sidebarStreak').textContent = max || 0;
   },
+
+  // === CEO 日报 ===
 
   openCeoModal() {
     const d = Store.get();
