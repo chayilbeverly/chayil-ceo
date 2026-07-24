@@ -1389,6 +1389,50 @@ ul { list-style: none; }
 }
 
 /* ============================================
+   云端同步指示器
+   ============================================ */
+.sync-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 8px;
+  margin-top: 12px;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.sync-indicator:hover { background: var(--bg-hover); }
+.sync-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.sync-dot.sync-on { background: var(--green); box-shadow: 0 0 6px rgba(91,140,106,0.5); }
+.sync-dot.sync-off { background: var(--ink-300); }
+.sync-dot.sync-spin {
+  background: var(--gold-deep);
+  animation: syncSpin 1s linear infinite;
+}
+@keyframes syncSpin {
+  0% { opacity: 1; }
+  50% { opacity: 0.3; }
+  100% { opacity: 1; }
+}
+.sync-text {
+  font-size: 11px;
+  color: var(--ink-500);
+  white-space: nowrap;
+}
+
+/* 表单提示 */
+.form-hint {
+  font-size: 11px;
+  color: var(--ink-400);
+  margin-top: 6px;
+  line-height: 1.5;
+}
+
+/* ============================================
    响应式补充
    ============================================ */
 @media (max-width: 1100px) {
