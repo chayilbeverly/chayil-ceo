@@ -120,21 +120,36 @@ const App = {
     }
   },
 
-  // === 数据迁移 ===
+  // === 数据迁移（localStorage → Supabase 分离表） ===
 
   async checkMigration() {
     if (Store.hasLegacyData()) {
       const legacy = Store.getLegacyData();
       if (legacy) {
         const confirmed = confirm(
-          '检测到旧版本地数据（v3）。\n\n' +
+          '📦 检测到旧版本地数据。\n\n' +
           '是否将旧数据导入到云端账号？\n' +
-          '选择「确定」导入，「取消」则使用全新数据。'
+          '选择「确定」导入并同步到 Supabase 数据库，\n' +
+          '选择「取消」则使用全新数据。'
         );
         if (confirmed) {
-          Store.migrateLegacy(legacy);
-          // 清除旧数据标记（保留备份）
-          localStorage.setItem('chayil_ceo_data_v3_backup', JSON.stringify(legacy));
+          // 合并旧数据到当前 Store
+          Store.update(d => {
+            const merged = Store.deepMerge(d, legacy);
+            Object.assign(d, merged);
+          });
+
+          // 迁移到 Supabase 分离表
+          const result = await Supa.migrateFromBlob(legacy);
+          if (result.success) {
+            UI.toast('✅ ' + result.message);
+          } else {
+            UI.toast('⚠ ' + result.message);
+          }
+
+          // 清除旧版本标记（保留备份）
+          localStorage.setItem('chayil_ceo_data_legacy_backup', JSON.stringify(legacy));
+          localStorage.removeItem('chayil_ceo_data_v4');
           localStorage.removeItem('chayil_ceo_data_v3');
         }
       }

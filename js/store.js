@@ -1,21 +1,18 @@
 /* ============================================
-   Chayil CEO OS — Data Store v4
-   Supabase 云端存储 + localStorage 离线缓存
+   Chayil CEO OS — Data Store v5
+   Supabase 分离表存储 + localStorage 离线缓存
    支持：多设备实时同步 / 用户隔离 / 离线回退
    ============================================ */
 
 const Store = (function () {
-  const KEY = 'chayil_ceo_data_v4';
+  const KEY = 'chayil_ceo_data_v5';
 
   function todayStr() {
     const d = new Date();
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   }
 
-  function uid() {
-    return Supa.uid();
-  }
-
+  function uid() { return Supa.uid(); }
   function now() { return Date.now(); }
 
   // 默认种子数据
@@ -84,47 +81,37 @@ const Store = (function () {
   }
 
   let data = null;
-  let cloudVersion = null;    // 云端 updated_at
+  let cloudUpdatedAt = null;
   let saveDebounceTimer = null;
   let isSaving = false;
 
-  // ========== 本地存储（离线缓存 + 快速启动） ==========
+  // ========== 本地存储 ==========
 
   function loadLocal() {
     try {
       const raw = localStorage.getItem(KEY);
-      if (raw) {
-        data = JSON.parse(raw);
-        return true;
-      }
+      if (raw) { data = JSON.parse(raw); return true; }
     } catch (e) { /* fall through */ }
     return false;
   }
 
   function saveLocal() {
-    try {
-      localStorage.setItem(KEY, JSON.stringify(data));
-    } catch (e) {
-      console.warn('localStorage 写入失败:', e.message);
-    }
+    try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (e) {}
   }
 
-  // ========== 云端存储 ==========
+  // ========== 云端存储（分离表） ==========
 
-  /**
-   * 推送数据到 Supabase（防抖 2 秒）
-   */
   function scheduleCloudSave() {
     clearTimeout(saveDebounceTimer);
     saveDebounceTimer = setTimeout(async () => {
-      if (isSaving) return;
+      if (isSaving || !Supa.getUserId()) return;
       isSaving = true;
       try {
         data._syncVersion = Date.now();
-        const ok = await Supa.saveAppData(data);
+        const ok = await Supa.pushAllData(data);
         if (ok) {
-          cloudVersion = new Date().toISOString();
-          saveLocal(); // 同时保存本地
+          cloudUpdatedAt = new Date().toISOString();
+          saveLocal();
         }
       } catch (e) {
         console.warn('云端保存失败:', e.message);
@@ -134,17 +121,15 @@ const Store = (function () {
     }, 2000);
   }
 
-  /**
-   * 立即推送到云端
-   */
   async function pushNow() {
     clearTimeout(saveDebounceTimer);
+    if (!Supa.getUserId()) return false;
     isSaving = true;
     try {
       data._syncVersion = Date.now();
-      const ok = await Supa.saveAppData(data);
+      const ok = await Supa.pushAllData(data);
       if (ok) {
-        cloudVersion = new Date().toISOString();
+        cloudUpdatedAt = new Date().toISOString();
         saveLocal();
       }
       return ok;
@@ -156,26 +141,14 @@ const Store = (function () {
     }
   }
 
-  /**
-   * 从云端拉取并合并数据
-   * 返回 true 表示有新数据合并
-   */
   async function pullFromCloud() {
     if (!Supa.getUserId()) return false;
-
     try {
-      const result = await Supa.loadAppData();
-      if (!result || !result.data) return false;
+      const remoteData = await Supa.pullAllData(data);
+      if (!remoteData) return false;
 
-      const remoteData = result.data;
-      const remoteVer = result.updatedAt;
-
-      // 比较时间戳
-      if (cloudVersion && remoteVer <= cloudVersion) return false;
-
-      // 合并：云端数据优先（取 _updated 时间戳大的）
+      // 深度合并（保留本地最新修改）
       data = deepMerge(data, remoteData);
-      cloudVersion = remoteVer;
       saveLocal();
       return true;
     } catch (e) {
@@ -184,22 +157,14 @@ const Store = (function () {
     }
   }
 
-  /**
-   * 深度合并：按 id 合并数组，同 id 取 _updated 大的
-   */
+  // ========== 深度合并 ==========
+
   function deepMerge(local, remote) {
     if (!remote) return local;
     if (!local) return remote;
-
     const result = JSON.parse(JSON.stringify(local));
 
-    // 合并 ID 数组
-    const idArrays = ['inspirations', 'radar', 'reviews'];
-    idArrays.forEach(key => {
-      result[key] = mergeArrayById(local[key] || [], remote[key] || []);
-    });
-
-    // 合并 tasks
+    // 合并任务
     if (remote.tasks) {
       result.tasks = result.tasks || {};
       ['personalGrowth', 'business', 'contentGrowth'].forEach(sub => {
@@ -211,7 +176,7 @@ const Store = (function () {
       result.tasks.topThree = remote.tasks.topThree || (local.tasks && local.tasks.topThree) || [];
     }
 
-    // 合并 finance
+    // 合并财务
     if (remote.finance) {
       result.finance = result.finance || {};
       result.finance.income = mergeArrayById(
@@ -225,7 +190,7 @@ const Store = (function () {
       result.finance.dailyTarget = remote.finance.dailyTarget || (local.finance && local.finance.dailyTarget) || 4000;
     }
 
-    // 合并 assets
+    // 合并资产
     if (remote.assets) {
       result.assets = result.assets || {};
       ['customers', 'products', 'deals', 'contentAssets'].forEach(sub => {
@@ -236,29 +201,33 @@ const Store = (function () {
       });
     }
 
+    // 合并灵感 / 雷达 / 复盘
+    ['inspirations', 'radar', 'reviews'].forEach(key => {
+      result[key] = mergeArrayById(
+        (local[key] || []), (remote[key] || [])
+      );
+    });
+
     // 合并 meta
     if (remote.meta) {
       result.meta = result.meta || {};
       result.meta.created = remote.meta.created || (local.meta && local.meta.created) || '';
       result.meta.streak = Math.max((local.meta && local.meta.streak) || 0, remote.meta.streak || 0);
       result.meta.lastStreakDate = remote.meta.lastStreakDate || (local.meta && local.meta.lastStreakDate) || '';
-
-      // streakHistory 取并集
       if (remote.meta.streakHistory) {
         result.meta.streakHistory = result.meta.streakHistory || {};
         ['fitness', 'english', 'learning', 'spiritual'].forEach(hk => {
-          const lArr = (local.meta && local.meta.streakHistory && local.meta.streakHistory[hk]) || [];
-          const rArr = (remote.meta.streakHistory && remote.meta.streakHistory[hk]) || [];
+          const lArr = ((local.meta && local.meta.streakHistory && local.meta.streakHistory[hk]) || []);
+          const rArr = (remote.meta.streakHistory[hk] || []);
           result.meta.streakHistory[hk] = Array.from(new Set(lArr.concat(rArr))).sort();
         });
       }
-
       if (remote.meta.personalStreaks) {
         result.meta.personalStreaks = result.meta.personalStreaks || {};
         ['fitness', 'english', 'learning', 'spiritual'].forEach(pk => {
           result.meta.personalStreaks[pk] = Math.max(
-            (local.meta && local.meta.personalStreaks && local.meta.personalStreaks[pk]) || 0,
-            remote.meta.personalStreaks[pk] || 0
+            ((local.meta && local.meta.personalStreaks && local.meta.personalStreaks[pk]) || 0),
+            (remote.meta.personalStreaks[pk] || 0)
           );
         });
       }
@@ -274,9 +243,8 @@ const Store = (function () {
     arrB.forEach(item => {
       if (!item || !item.id) return;
       const existing = map.get(item.id);
-      if (!existing) {
-        map.set(item.id, item);
-      } else {
+      if (!existing) { map.set(item.id, item); }
+      else {
         const tsA = existing._updated || 0;
         const tsB = item._updated || 0;
         if (tsB > tsA) map.set(item.id, item);
@@ -285,70 +253,66 @@ const Store = (function () {
     return Array.from(map.values());
   }
 
-  // ========== 公开 API（保持与旧版兼容） ==========
+  // ========== 公开 API ==========
 
-  /**
-   * 异步加载：本地 → 云端合并
-   * 返回 data
-   */
   async function load() {
-    // 1. 先加载本地缓存（快速渲染）
     const hasLocal = loadLocal();
 
     if (!hasLocal) {
-      // 无本地缓存，尝试从云端加载
-      try {
-        const result = await Supa.loadAppData();
-        if (result && result.data) {
-          data = result.data;
-          cloudVersion = result.updatedAt;
-          saveLocal();
-        } else {
+      // 无本地缓存，尝试云端加载
+      if (Supa.getUserId()) {
+        try {
+          const remote = await Supa.pullAllData(seed());
+          if (remote) {
+            data = remote;
+            saveLocal();
+          } else {
+            data = seed();
+          }
+        } catch (e) {
           data = seed();
         }
-      } catch (e) {
+      } else {
         data = seed();
       }
     } else {
-      // 有本地缓存，异步拉取云端合并
-      try {
-        const result = await Supa.loadAppData();
-        if (result && result.data && result.updatedAt) {
-          if (!cloudVersion || result.updatedAt > cloudVersion) {
-            data = deepMerge(data, result.data);
-            cloudVersion = result.updatedAt;
+      // 有本地缓存，异步合并云端
+      if (Supa.getUserId()) {
+        try {
+          const remote = await Supa.pullAllData(data);
+          if (remote) {
+            data = deepMerge(data, remote);
             saveLocal();
           }
+        } catch (e) {
+          console.log('离线模式，使用本地缓存');
         }
-      } catch (e) {
-        // 离线模式，使用本地数据
-        console.log('离线模式，使用本地缓存');
       }
     }
 
-    // 确保 streakHistory
+    // 确保必要字段
     if (!data.meta) data.meta = {};
     if (!data.meta.streakHistory) {
       data.meta.streakHistory = { fitness: [], english: [], learning: [], spiritual: [] };
     }
-
-    return data;
-  }
-
-  /**
-   * 同步获取当前数据（所有模块都用这个）
-   */
-  function get() {
-    if (!data) {
-      loadLocal();
-      if (!data) data = seed();
+    if (!data.meta.personalStreaks) {
+      data.meta.personalStreaks = { fitness: 0, english: 0, learning: 0, spiritual: 0 };
     }
+    if (!data.tasks) data.tasks = { topThree: [], personalGrowth: [], business: [], contentGrowth: [] };
+    if (!data.finance) data.finance = { dailyTarget: 4000, income: [], expense: [] };
+    if (!data.assets) data.assets = { customers: [], products: [], deals: [], contentAssets: [] };
+    if (!data.inspirations) data.inspirations = [];
+    if (!data.radar) data.radar = [];
+    if (!data.reviews) data.reviews = [];
+
     return data;
   }
 
-  /**
-   * 修改数据 + 自动保存
-   */
+  function get() {
+    if (!data) { loadLocal(); if (!data) data = seed(); }
+    return data;
+  }
+
   function update(fn) {
     if (!data) get();
     fn(data);
@@ -357,17 +321,12 @@ const Store = (function () {
     scheduleCloudSave();
   }
 
-  /**
-   * 保存（本地 + 云端）
-   */
   function save() {
     saveLocal();
     scheduleCloudSave();
   }
 
-  /**
-   * 通用增删改（均带 _updated 时间戳）
-   */
+  // 通用 CRUD
   function addItem(collection, item, parent) {
     update(d => {
       const arr = parent ? d[parent][collection] : d[collection];
@@ -387,14 +346,10 @@ const Store = (function () {
     update(d => {
       const arr = parent ? d[parent][collection] : d[collection];
       const idx = arr.findIndex(x => x.id === id);
-      if (idx > -1) {
-        Object.assign(arr[idx], patch);
-        arr[idx]._updated = now();
-      }
+      if (idx > -1) { Object.assign(arr[idx], patch); arr[idx]._updated = now(); }
     });
   }
 
-  // 计算连续打卡天数
   function calcStreak(dates) {
     if (!dates || !dates.length) return 0;
     const sorted = [...new Set(dates)].sort().reverse();
@@ -418,61 +373,37 @@ const Store = (function () {
     }
   }
 
-  /**
-   * 获取云端版本时间戳（用于同步状态显示）
-   */
-  function getCloudVersion() {
-    return cloudVersion;
-  }
+  function getCloudVersion() { return cloudUpdatedAt; }
 
   // ========== 数据迁移 ==========
 
-  /**
-   * 检测是否有旧版 localStorage 数据（v3 格式）
-   */
   function hasLegacyData() {
-    return !!localStorage.getItem('chayil_ceo_data_v3');
+    return !!localStorage.getItem('chayil_ceo_data_v4') ||
+           !!localStorage.getItem('chayil_ceo_data_v3');
   }
 
-  /**
-   * 获取旧数据
-   */
   function getLegacyData() {
-    try {
-      const raw = localStorage.getItem('chayil_ceo_data_v3');
-      return raw ? JSON.parse(raw) : null;
-    } catch (e) { return null; }
-  }
-
-  /**
-   * 迁移旧数据到当前 Store
-   */
-  function migrateLegacy(legacyData) {
-    if (!legacyData) return;
-    data = deepMerge(data, legacyData);
-    saveLocal();
-    scheduleCloudSave();
+    // 优先 v4，其次 v3
+    const v4 = localStorage.getItem('chayil_ceo_data_v4');
+    if (v4) {
+      try { return JSON.parse(v4); } catch (e) {}
+    }
+    const v3 = localStorage.getItem('chayil_ceo_data_v3');
+    if (v3) {
+      try { return JSON.parse(v3); } catch (e) {}
+    }
+    return null;
   }
 
   return {
-    load,
-    get,
-    update,
-    save,
-    addItem,
-    removeItem,
-    updateItem,
-    uid,
-    todayStr,
-    calcStreak,
-    ensureStreakHistory,
-    pushNow,
-    pullFromCloud,
+    load, get, update, save,
+    addItem, removeItem, updateItem,
+    uid, todayStr,
+    calcStreak, ensureStreakHistory,
+    pushNow, pullFromCloud,
     getCloudVersion,
-    seed,
-    KEY,
-    hasLegacyData,
-    getLegacyData,
-    migrateLegacy,
+    seed, KEY,
+    hasLegacyData, getLegacyData,
+    deepMerge, mergeArrayById,
   };
 })();
