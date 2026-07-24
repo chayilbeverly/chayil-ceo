@@ -24,6 +24,7 @@ const Store = (function () {
         created: today,
         streak: 0,
         personalStreaks: { fitness: 0, english: 0, learning: 0, spiritual: 0 },
+        streakHistory: { fitness: [], english: [], learning: [], spiritual: [] },
         lastStreakDate: today,
       },
       tasks: {
@@ -174,6 +175,34 @@ const Store = (function () {
     save();
   }
 
+  // 计算连续打卡天数（从今天往前数，一旦断掉就停）
+  function calcStreak(dates) {
+    if (!dates || !dates.length) return 0;
+    const sorted = [...new Set(dates)].sort().reverse(); // 去重，最新在前
+    const today = todayStr();
+    let expected = today;
+    let streak = 0;
+    for (const d of sorted) {
+      if (d === expected) {
+        streak++;
+        // 计算前一天
+        const dt = new Date(d);
+        dt.setDate(dt.getDate() - 1);
+        expected = dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0');
+      } else if (d < expected) {
+        break; // 断掉了
+      }
+    }
+    return streak;
+  }
+
+  // 确保 streakHistory 存在（兼容旧数据）
+  function ensureStreakHistory() {
+    if (!data.meta.streakHistory) {
+      data.meta.streakHistory = { fitness: [], english: [], learning: [], spiritual: [] };
+    }
+  }
+
   // 通用增删改
   function addItem(collection, item, parent) {
     update(d => {
@@ -199,6 +228,7 @@ const Store = (function () {
   return {
     load, get, update, save, saveLocal, syncNow,
     uid, todayStr, addItem, removeItem, updateItem,
+    calcStreak, ensureStreakHistory,
     seed, KEY
   };
 })();
