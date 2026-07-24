@@ -104,21 +104,27 @@ const Store = (function () {
   function scheduleCloudSave() {
     clearTimeout(saveDebounceTimer);
     saveDebounceTimer = setTimeout(async () => {
-      if (_cloudBusy || !Supa.getUserId()) return;
+      if (_cloudBusy) { console.log('[自动保存] 同步锁忙，稍后重试'); return; }
+      if (!Supa.getUserId()) { console.log('[自动保存] 未登录，跳过'); return; }
       _cloudBusy = true;
       try {
         data._syncVersion = Date.now();
+        const taskCount = (data.tasks.personalGrowth||[]).length + (data.tasks.business||[]).length + (data.tasks.contentGrowth||[]).length;
+        console.log('[自动保存] 触发推送: tasks=', taskCount, 'customers=', (data.assets.customers||[]).length);
         const ok = await Supa.pushAllData(data);
         if (ok) {
           cloudUpdatedAt = new Date().toISOString();
           saveLocal();
+          console.log('[自动保存] ✅ 推送成功, time:', cloudUpdatedAt);
+        } else {
+          console.error('[自动保存] ❌ 推送失败');
         }
       } catch (e) {
-        console.warn('云端保存失败:', e.message);
+        console.error('[自动保存] 异常:', e);
       } finally {
         _cloudBusy = false;
       }
-    }, 2000);
+    }, 1000);
   }
 
   async function pushNow() {
