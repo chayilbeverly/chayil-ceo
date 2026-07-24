@@ -3,7 +3,7 @@
    缓存策略：Network First（优先网络，离线回退缓存）
    ============================================ */
 
-const CACHE_NAME = 'chayil-ceo-v1';
+const CACHE_NAME = 'chayil-ceo-v2';
 const STATIC_ASSETS = [
   '/chayil-ceo/',
   '/chayil-ceo/index.html',
@@ -64,9 +64,13 @@ self.addEventListener('fetch', function (event) {
   // 跳过 Google Fonts / CDN
   if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') return;
 
+  // 对本站资源强制走网络，避免浏览器/缓存旧版本配置
+  var isLocalAsset = url.pathname.indexOf('/chayil-ceo/') === 0;
+  var fetchOptions = isLocalAsset ? { cache: 'no-cache' } : {};
+
   // Network First：先尝试网络，失败则用缓存
   event.respondWith(
-    fetch(event.request).then(function (response) {
+    fetch(event.request, fetchOptions).then(function (response) {
       // 网络成功 → 更新缓存
       if (response.ok) {
         var cloned = response.clone();
