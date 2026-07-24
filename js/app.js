@@ -1,7 +1,6 @@
 /* ============================================
-   Chayil CEO OS — Main App v3.2
-   路由 / 导航 / CEO 日报 / 云端实时同步
-   新增：12s轮询、页面聚焦拉取、远程更新自动刷新
+   Chayil CEO OS — Main App v4
+   Supabase 认证 + 云端实时同步 + 响应式布局
    ============================================ */
 
 const App = {
@@ -19,12 +18,28 @@ const App = {
   },
 
   async init() {
-    // 云端同步初始化
-    await this.initSync();
+    // === Supabase 配置检查 ===
+    if (!Supa.isConfigured()) {
+      // Supabase 未配置，使用纯本地模式（兼容旧版）
+      console.warn('⚠ Supabase 未配置，使用本地存储模式');
+      await this.initLocalMode();
+      return;
+    }
 
+    // === 认证检查 ===
+    const session = await Supa.getSession();
+    if (!session) {
+      window.location.href = 'login.html';
+      return;
+    }
+
+    // === 数据迁移检测 ===
+    await this.checkMigration();
+
+    // === 加载数据（本地 + 云端） ===
     await Store.load();
 
-    // 确保 streakHistory 存在并重新计算连续天数
+    // === 重新计算 streak ===
     Store.update(data => {
       Store.ensureStreakHistory();
       const history = data.meta.streakHistory || {};
@@ -36,13 +51,19 @@ const App = {
       });
     });
 
-    // 预填充灵感与爆款数据
+    // === 预填充灵感与爆款数据 ===
     Store.update(data => {
       if ((!data.inspirations || !data.inspirations.length) && typeof INSPIRATION_SEED !== 'undefined') {
-        data.inspirations = INSPIRATION_SEED.map(s => ({ id: Store.uid(), ...s, _updated: Date.now(), date: Store.todayStr(), category: s.category || '创业', status: 'pending' }));
+        data.inspirations = INSPIRATION_SEED.map(s => ({
+          id: Store.uid(), ...s, _updated: Date.now(), date: Store.todayStr(),
+          category: s.category || '创业', status: 'pending'
+        }));
       }
       if ((!data.radar || !data.radar.length) && typeof RADAR_SEED !== 'undefined') {
-        data.radar = RADAR_SEED.map(s => ({ id: Store.uid(), ...s, _updated: Date.now(), date: Store.todayStr(), bookmarked: false, emotionPoint: s.emotionPoint || '', myAdaptation: s.myAdaptation || '' }));
+        data.radar = RADAR_SEED.map(s => ({
+          id: Store.uid(), ...s, _updated: Date.now(), date: Store.todayStr(),
+          bookmarked: false, emotionPoint: s.emotionPoint || '', myAdaptation: s.myAdaptation || ''
+        }));
       }
     });
 
@@ -52,38 +73,26 @@ const App = {
     this.renderSyncStatus();
     this.route(this.current);
 
-    // 同步状态监听
-    Sync.onChange(() => this.renderSyncStatus());
-
-    // 注册远程更新回调：当轮询发现远程有新数据时自动合并刷新
-    Sync.onRemoteUpdateCallback((remoteData) => {
-      const changed = Store.mergeRemote(remoteData);
+    // === 启动 Supabase 轮询（每 5 秒） ===
+    Supa.startPolling(async () => {
+      const changed = await Store.pullFromCloud();
       if (changed) {
         this.renderSyncStatus();
         this.renderStreak();
-        // 刷新当前视图
         this.route(this.current);
-        UI.toast('已从云端同步最新数据');
+        UI.toast('云端数据已同步');
       }
     });
 
-    // 启动云端轮询（每 12 秒检查一次）
-    if (Sync.hasToken()) {
-      Sync.startPolling(() => Store.get());
-    }
-
-    // === 页面可见性变化时立即拉取 ===
+    // === 页面可见时立即拉取 ===
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible' && Sync.hasToken()) {
+      if (document.visibilityState === 'visible') {
         this.onPageVisible();
       }
     });
 
-    // === 窗口获得焦点时拉取 ===
     window.addEventListener('focus', () => {
-      if (Sync.hasToken()) {
-        this.onPageVisible();
-      }
+      this.onPageVisible();
     });
 
     // === CEO 日报按钮 ===
@@ -92,138 +101,92 @@ const App = {
       if (e.target.id === 'ceoModal') this.closeCeoModal();
     });
 
-    // === 同步按钮 ===
-    document.getElementById('syncSetupBtn').addEventListener('click', () => this.openSyncModal());
-    document.getElementById('syncModal').addEventListener('click', e => {
-      if (e.target.id === 'syncModal') this.closeSyncModal();
-    });
-    document.getElementById('syncModalClose').addEventListener('click', () => this.closeSyncModal());
-    document.getElementById('syncSaveBtn').addEventListener('click', () => this.saveSyncToken());
-    document.getElementById('syncDisableBtn').addEventListener('click', () => this.disableSync());
+    // === 顶部同步状态按钮 ===
+    const syncStatusBtn = document.getElementById('syncStatusBtn');
+    if (syncStatusBtn) {
+      syncStatusBtn.addEventListener('click', () => this.showSyncInfo());
+    }
 
-    // === 侧边栏同步指示器点击手动同步 ===
-    document.getElementById('syncIndicator').addEventListener('click', async () => {
-      if (Sync.hasToken()) {
-        const ok = await Store.syncNow();
-        this.renderSyncStatus();
-        if (ok) {
-          this.renderStreak();
-          this.route(this.current);
-          UI.toast('同步完成');
+    // === 退出登录 ===
+    const logoutBtn = document.getElementById('logoutBtn');
+    if (logoutBtn) {
+      logoutBtn.addEventListener('click', async () => {
+        if (confirm('确定退出登录？本地数据不会丢失。')) {
+          Supa.stopPolling();
+          await Supa.signOut();
+          window.location.href = 'login.html';
         }
-      } else {
-        this.openSyncModal();
-      }
-    });
+      });
+    }
   },
 
-  // === 页面恢复可见时静默拉取 ===
+  // === 数据迁移 ===
+
+  async checkMigration() {
+    if (Store.hasLegacyData()) {
+      const legacy = Store.getLegacyData();
+      if (legacy) {
+        const confirmed = confirm(
+          '检测到旧版本地数据（v3）。\n\n' +
+          '是否将旧数据导入到云端账号？\n' +
+          '选择「确定」导入，「取消」则使用全新数据。'
+        );
+        if (confirmed) {
+          Store.migrateLegacy(legacy);
+          // 清除旧数据标记（保留备份）
+          localStorage.setItem('chayil_ceo_data_v3_backup', JSON.stringify(legacy));
+          localStorage.removeItem('chayil_ceo_data_v3');
+        }
+      }
+    }
+  },
+
+  // === 页面恢复可见时拉取 ===
 
   async onPageVisible() {
     try {
-      const result = await Sync.pullRaw();
-      if (result && result.data) {
-        const changed = Store.mergeRemote(result.data);
-        if (changed) {
-          this.renderSyncStatus();
-          this.renderStreak();
-          this.route(this.current);
-          console.log('👁 页面聚焦：云端数据已合并');
-        } else {
-          this.renderSyncStatus();
-        }
+      const changed = await Store.pullFromCloud();
+      if (changed) {
+        this.renderSyncStatus();
+        this.renderStreak();
+        this.route(this.current);
       }
     } catch (e) { /* 静默 */ }
   },
 
-  // === 云端同步 ===
-
-  async initSync() {
-    const savedToken = Sync.getToken();
-    if (savedToken) {
-      try {
-        const result = await Sync.pullRaw();
-        if (result && result.data) {
-          this._remoteData = result.data;
-        }
-      } catch (e) {
-        console.log('初始化同步跳过:', e.message);
-      }
-    }
-  },
+  // === 同步状态 ===
 
   renderSyncStatus() {
     const dot = document.getElementById('syncDot');
     const text = document.getElementById('syncText');
     if (!dot || !text) return;
 
-    const status = Sync.getStatus();
-    const hasToken = Sync.hasToken();
-    const lastSync = Sync.getLastSync();
-
+    const cloudVer = Store.getCloudVersion();
     dot.className = 'sync-dot';
-    if (!hasToken) {
+    if (!Supa.getUserId()) {
       dot.classList.add('sync-off');
-      text.textContent = '未配置同步';
-    } else if (status === 'pulling' || status === 'pushing') {
-      dot.classList.add('sync-spin');
-      text.textContent = status === 'pulling' ? '拉取中...' : '保存中...';
-    } else if (status === 'ok') {
+      text.textContent = '未登录';
+    } else if (cloudVer) {
       dot.classList.add('sync-on');
-      const time = lastSync ? this.formatSyncTime(lastSync) : '';
-      text.textContent = time ? '已同步 ' + time : '已同步';
-    } else if (status === 'error') {
-      dot.classList.add('sync-off');
-      text.textContent = '同步失败';
+      const d = new Date(cloudVer);
+      const now = new Date();
+      const diff = Math.floor((now - d) / 1000);
+      if (diff < 10) text.textContent = '已同步 · 刚刚';
+      else if (diff < 60) text.textContent = '已同步 · ' + diff + '秒前';
+      else if (diff < 3600) text.textContent = '已同步 · ' + Math.floor(diff / 60) + '分钟前';
+      else text.textContent = '已同步 · ' + Math.floor(diff / 3600) + '小时前';
     } else {
       dot.classList.add('sync-on');
-      text.textContent = '本地模式';
+      text.textContent = '已连接';
     }
   },
 
-  formatSyncTime(iso) {
-    const d = new Date(iso);
-    const now = new Date();
-    const diff = Math.floor((now - d) / 1000);
-    if (diff < 60) return '刚刚';
-    if (diff < 3600) return Math.floor(diff / 60) + '分钟前';
-    if (diff < 86400) return Math.floor(diff / 3600) + '小时前';
-    return d.getMonth() + 1 + '/' + d.getDate() + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
-  },
-
-  openSyncModal() {
-    document.getElementById('syncTokenInput').value = Sync.getToken() || '';
-    document.getElementById('syncModal').classList.add('show');
-  },
-
-  closeSyncModal() {
-    document.getElementById('syncModal').classList.remove('show');
-  },
-
-  saveSyncToken() {
-    const token = document.getElementById('syncTokenInput').value.trim();
-    if (!token) return;
-
-    Sync.setToken(token);
-    this.closeSyncModal();
-
-    // 启动轮询
-    Sync.startPolling(() => Store.get());
-
-    // 立即推送当前数据到云端
-    Store.syncNow().then(() => {
-      this.renderSyncStatus();
-      console.log('✅ 同步已启用，数据已推送');
-    });
-  },
-
-  disableSync() {
-    if (confirm('确定断开云端同步？本地数据不会丢失。')) {
-      localStorage.removeItem('chayil_gh_token');
-      Sync.stopPolling();
-      this.closeSyncModal();
-      this.renderSyncStatus();
-    }
+  showSyncInfo() {
+    const cloudVer = Store.getCloudVersion();
+    const msg = cloudVer
+      ? '最后同步：' + new Date(cloudVer).toLocaleString('zh-CN')
+      : '尚未同步到云端，数据仅存在本地。';
+    UI.toast(msg);
   },
 
   // === 路由 ===
@@ -247,16 +210,14 @@ const App = {
     // 移动端同步按钮
     const mnavSync = document.getElementById('mnavSync');
     if (mnavSync) {
-      mnavSync.addEventListener('click', () => {
-        if (Sync.hasToken()) {
-          Store.syncNow().then(() => {
-            this.renderSyncStatus();
-            this.renderStreak();
-            this.route(this.current);
-            UI.toast('同步完成');
-          });
+      mnavSync.addEventListener('click', async () => {
+        UI.toast('正在同步...');
+        const ok = await Store.pushNow();
+        if (ok) {
+          this.renderSyncStatus();
+          UI.toast('同步完成 ✓');
         } else {
-          this.openSyncModal();
+          UI.toast('同步失败，请检查网络');
         }
       });
     }
@@ -266,7 +227,6 @@ const App = {
     if (!this.routes[name]) return;
     this.current = name;
     document.querySelectorAll('.nav-item').forEach(i => i.classList.toggle('active', i.dataset.route === name));
-    // 同步移动端底部导航
     document.querySelectorAll('.mnav-item[data-mroute]').forEach(i => i.classList.toggle('active', i.dataset.mroute === name));
     document.getElementById('pageTitle').textContent = this.routes[name].title;
 
@@ -330,7 +290,6 @@ const App = {
           ${undone.length ? `<ul>${undone.map(t => `<li>${UI.esc(t.text)}</li>`).join('')}</ul>` : '<p>今日任务已全部完成，给自己一杯好咖啡 ☕</p>'}
         </div>
       </div>
-
       <div class="ceo-section">
         <div class="ceo-section-label">商业提醒</div>
         <div class="ceo-section-body">
@@ -342,21 +301,18 @@ const App = {
           </ul>
         </div>
       </div>
-
       <div class="ceo-section">
         <div class="ceo-section-label">行业热点</div>
         <div class="ceo-section-body">
           ${topRadar ? `<p><b>${UI.esc(topRadar.title)}</b></p><p style="color:var(--ink-500);font-size:12px">爆款原因：${UI.esc((topRadar.reasons||[]).slice(0,2).join('；'))}</p>` : '<p>今日暂无热点</p>'}
         </div>
       </div>
-
       <div class="ceo-section">
         <div class="ceo-section-label">内容建议</div>
         <div class="ceo-section-body">
           ${topTopic ? `<p>今日推荐选题：<b>${UI.esc(topTopic.title)}</b></p><p style="color:var(--ink-500);font-size:12px">方向：${UI.esc(topTopic.direction)} · 适合平台：${UI.esc(topTopic.platform)}</p>` : '<p>前往灵感中心查看今日选题</p>'}
         </div>
       </div>
-
       <div class="ceo-section">
         <div class="ceo-section-label">成长箴言</div>
         <div class="ceo-section-body" style="font-family:var(--ff-serif);font-size:16px;color:var(--gold-deep);font-style:italic">
@@ -370,6 +326,57 @@ const App = {
 
   closeCeoModal() {
     document.getElementById('ceoModal').classList.remove('show');
+  },
+
+  // === 本地模式（Supabase 未配置时的回退） ===
+  async initLocalMode() {
+    await Store.load();
+    Store.update(data => {
+      Store.ensureStreakHistory();
+      const history = data.meta.streakHistory || {};
+      const keys = ['fitness', 'english', 'learning', 'spiritual'];
+      if (!data.meta.personalStreaks) data.meta.personalStreaks = {};
+      keys.forEach(k => {
+        if (!history[k]) history[k] = [];
+        data.meta.personalStreaks[k] = Store.calcStreak(history[k]);
+      });
+    });
+    Store.update(data => {
+      if ((!data.inspirations || !data.inspirations.length) && typeof INSPIRATION_SEED !== 'undefined') {
+        data.inspirations = INSPIRATION_SEED.map(s => ({ id: Store.uid(), ...s, _updated: Date.now(), date: Store.todayStr(), category: s.category || '创业', status: 'pending' }));
+      }
+      if ((!data.radar || !data.radar.length) && typeof RADAR_SEED !== 'undefined') {
+        data.radar = RADAR_SEED.map(s => ({ id: Store.uid(), ...s, _updated: Date.now(), date: Store.todayStr(), bookmarked: false, emotionPoint: s.emotionPoint || '', myAdaptation: s.myAdaptation || '' }));
+      }
+    });
+
+    this.bindNav();
+    this.renderDate();
+    this.renderStreak();
+    this.renderSyncStatusLocal();
+    this.route(this.current);
+
+    // 本地模式下同步按钮触发 Supabase 配置提示
+    document.getElementById('ceoReportBtn').addEventListener('click', () => this.openCeoModal());
+    document.getElementById('ceoModal').addEventListener('click', e => {
+      if (e.target.id === 'ceoModal') this.closeCeoModal();
+    });
+
+    const syncBtn = document.getElementById('syncStatusBtn');
+    if (syncBtn) {
+      syncBtn.addEventListener('click', () => {
+        alert('Supabase 尚未配置。\n\n请在 js/supabase.js 中填入你的 Supabase 项目 URL 和 anon key。\n\n1. 前往 supabase.com 创建项目\n2. Settings > API 复制 URL 和 anon key\n3. 在 SQL Editor 运行 supabase-schema.sql');
+      });
+    }
+  },
+
+  renderSyncStatusLocal() {
+    const dot = document.getElementById('syncDot');
+    const text = document.getElementById('syncText');
+    if (dot && text) {
+      dot.className = 'sync-dot sync-off';
+      text.textContent = '本地模式';
+    }
   },
 };
 

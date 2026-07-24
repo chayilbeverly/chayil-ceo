@@ -1450,6 +1450,21 @@ ul { list-style: none; }
   white-space: nowrap;
 }
 
+/* 顶部栏同步状态点 */
+.sync-dot-top {
+  display: inline-block;
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  margin-right: 2px;
+  vertical-align: middle;
+}
+.sync-dot-top.sync-on { background: var(--green); box-shadow: 0 0 4px rgba(91,140,106,0.6); }
+.sync-dot-top.sync-off { background: var(--red); box-shadow: 0 0 4px rgba(184,84,80,0.4); }
+.sync-dot-top.sync-spin {
+  background: var(--gold-deep);
+  animation: syncSpin 1s linear infinite;
+}
+
 /* 表单提示 */
 .form-hint {
   font-size: 11px;

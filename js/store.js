@@ -1,11 +1,11 @@
 /* ============================================
-   Chayil CEO OS — Data Store v3.2
-   基于 localStorage 的数据持久化层 + GitHub 云端实时同步
-   新增：_updated 时间戳、saveLocalOnly、mergeRemote
+   Chayil CEO OS — Data Store v4
+   Supabase 云端存储 + localStorage 离线缓存
+   支持：多设备实时同步 / 用户隔离 / 离线回退
    ============================================ */
 
 const Store = (function () {
-  const KEY = 'chayil_ceo_data_v3';
+  const KEY = 'chayil_ceo_data_v4';
 
   function todayStr() {
     const d = new Date();
@@ -13,7 +13,7 @@ const Store = (function () {
   }
 
   function uid() {
-    return 'id_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
+    return Supa.uid();
   }
 
   function now() { return Date.now(); }
@@ -84,142 +84,317 @@ const Store = (function () {
   }
 
   let data = null;
+  let cloudVersion = null;    // 云端 updated_at
+  let saveDebounceTimer = null;
+  let isSaving = false;
+
+  // ========== 本地存储（离线缓存 + 快速启动） ==========
 
   function loadLocal() {
     try {
       const raw = localStorage.getItem(KEY);
       if (raw) {
         data = JSON.parse(raw);
-      } else {
-        data = seed();
-        saveLocalOnly();
+        return true;
       }
-    } catch (e) {
-      data = seed();
-    }
-    return data;
-  }
-
-  /**
-   * 仅保存到 localStorage，不触发云端推送
-   * 用于从云端拉取数据后的本地落盘
-   */
-  function saveLocalOnly() {
-    data._syncVersion = Math.max(data._syncVersion || 0, Date.now());
-    localStorage.setItem(KEY, JSON.stringify(data));
+    } catch (e) { /* fall through */ }
+    return false;
   }
 
   function saveLocal() {
-    saveLocalOnly();
+    try {
+      localStorage.setItem(KEY, JSON.stringify(data));
+    } catch (e) {
+      console.warn('localStorage 写入失败:', e.message);
+    }
   }
 
-  // === 云端同步 ===
+  // ========== 云端存储 ==========
 
-  async function load() {
-    loadLocal();
-
-    // 尝试从云端拉取
-    if (typeof Sync !== 'undefined' && Sync.hasToken()) {
+  /**
+   * 推送数据到 Supabase（防抖 2 秒）
+   */
+  function scheduleCloudSave() {
+    clearTimeout(saveDebounceTimer);
+    saveDebounceTimer = setTimeout(async () => {
+      if (isSaving) return;
+      isSaving = true;
       try {
-        const result = await Sync.pullRaw();
-        if (result && result.data) {
-          const localVer = data._syncVersion || 0;
-          const remoteVer = result.data._syncVersion || 0;
-          if (remoteVer > localVer) {
-            // 云端更新，深度合并
-            data = Sync.deepMerge(data, result.data);
-            saveLocalOnly();
-            console.log('📥 已从云端同步数据 (v' + remoteVer + ' > v' + localVer + ')');
-          } else if (localVer > remoteVer) {
-            // 本地更新，推送上去（合并后推送）
-            Sync.debouncePush(data);
-            console.log('📤 云端数据较旧，推送本地版本');
-          }
-        } else if (result === null && data._syncVersion) {
-          // 云端没有数据，推送本地
-          Sync.debouncePush(data);
+        data._syncVersion = Date.now();
+        const ok = await Supa.saveAppData(data);
+        if (ok) {
+          cloudVersion = new Date().toISOString();
+          saveLocal(); // 同时保存本地
         }
       } catch (e) {
-        console.warn('云端同步跳过:', e.message);
+        console.warn('云端保存失败:', e.message);
+      } finally {
+        isSaving = false;
       }
-    }
-
-    // 加载后自动检测并修复乱码
-    if (typeof Sync !== 'undefined' && Sync.isGarbled) {
-      const garbled = Sync.scanGarbled(data);
-      if (garbled > 0) {
-        console.warn('⚠ 本地数据检测到 ' + garbled + ' 处乱码，自动修复...');
-        const repaired = Sync.repairGarbledData(data);
-        console.log('✅ 本地已修复 ' + repaired + ' 处乱码');
-        saveLocalOnly();
-      }
-    }
-
-    return data;
+    }, 2000);
   }
 
   /**
-   * 保存：写入 localStorage + 防抖推送到云端
-   * 推送时会先拉取远程数据做深度合并，避免覆盖冲突
+   * 立即推送到云端
    */
-  function save() {
-    saveLocalOnly();
-    if (typeof Sync !== 'undefined' && Sync.hasToken()) {
-      Sync.debouncePush(data);
-    }
-  }
-
-  /**
-   * 从远程合并数据到本地（由轮询触发）
-   * 只写本地，不触发推送
-   */
-  function mergeRemote(remoteData) {
-    if (!remoteData) return false;
-    const localVer = data._syncVersion || 0;
-    const remoteVer = remoteData._syncVersion || 0;
-    if (remoteVer <= localVer) return false;
-
-    // 修复远程数据中的乱码
-    if (typeof Sync !== 'undefined' && Sync.repairGarbledData) {
-      Sync.repairGarbledData(remoteData);
-    }
-
-    data = Sync.deepMerge(data, remoteData);
-    saveLocalOnly();
-    console.log('🔄 云端数据已合并到本地 (v' + remoteVer + ')');
-    return true;
-  }
-
-  // 手动触发立即同步（先拉取合并再推送）
-  async function syncNow() {
-    if (typeof Sync === 'undefined' || !Sync.hasToken()) return;
+  async function pushNow() {
+    clearTimeout(saveDebounceTimer);
+    isSaving = true;
     try {
-      const merged = await Sync.pullAndMerge(data);
-      if (merged) {
-        data = merged;
-        saveLocalOnly();
+      data._syncVersion = Date.now();
+      const ok = await Supa.saveAppData(data);
+      if (ok) {
+        cloudVersion = new Date().toISOString();
+        saveLocal();
       }
-      await Sync.pushNow(data);
-      console.log('✅ 手动同步完成');
+      return ok;
+    } catch (e) {
+      console.warn('云端推送失败:', e.message);
+      return false;
+    } finally {
+      isSaving = false;
+    }
+  }
+
+  /**
+   * 从云端拉取并合并数据
+   * 返回 true 表示有新数据合并
+   */
+  async function pullFromCloud() {
+    if (!Supa.getUserId()) return false;
+
+    try {
+      const result = await Supa.loadAppData();
+      if (!result || !result.data) return false;
+
+      const remoteData = result.data;
+      const remoteVer = result.updatedAt;
+
+      // 比较时间戳
+      if (cloudVersion && remoteVer <= cloudVersion) return false;
+
+      // 合并：云端数据优先（取 _updated 时间戳大的）
+      data = deepMerge(data, remoteData);
+      cloudVersion = remoteVer;
+      saveLocal();
       return true;
     } catch (e) {
-      console.warn('手动同步失败:', e.message);
+      console.warn('云端拉取失败:', e.message);
       return false;
     }
   }
 
-  function get() {
-    if (!data) loadLocal();
+  /**
+   * 深度合并：按 id 合并数组，同 id 取 _updated 大的
+   */
+  function deepMerge(local, remote) {
+    if (!remote) return local;
+    if (!local) return remote;
+
+    const result = JSON.parse(JSON.stringify(local));
+
+    // 合并 ID 数组
+    const idArrays = ['inspirations', 'radar', 'reviews'];
+    idArrays.forEach(key => {
+      result[key] = mergeArrayById(local[key] || [], remote[key] || []);
+    });
+
+    // 合并 tasks
+    if (remote.tasks) {
+      result.tasks = result.tasks || {};
+      ['personalGrowth', 'business', 'contentGrowth'].forEach(sub => {
+        result.tasks[sub] = mergeArrayById(
+          (local.tasks && local.tasks[sub]) || [],
+          (remote.tasks && remote.tasks[sub]) || []
+        );
+      });
+      result.tasks.topThree = remote.tasks.topThree || (local.tasks && local.tasks.topThree) || [];
+    }
+
+    // 合并 finance
+    if (remote.finance) {
+      result.finance = result.finance || {};
+      result.finance.income = mergeArrayById(
+        (local.finance && local.finance.income) || [],
+        (remote.finance && remote.finance.income) || []
+      );
+      result.finance.expense = mergeArrayById(
+        (local.finance && local.finance.expense) || [],
+        (remote.finance && remote.finance.expense) || []
+      );
+      result.finance.dailyTarget = remote.finance.dailyTarget || (local.finance && local.finance.dailyTarget) || 4000;
+    }
+
+    // 合并 assets
+    if (remote.assets) {
+      result.assets = result.assets || {};
+      ['customers', 'products', 'deals', 'contentAssets'].forEach(sub => {
+        result.assets[sub] = mergeArrayById(
+          (local.assets && local.assets[sub]) || [],
+          (remote.assets && remote.assets[sub]) || []
+        );
+      });
+    }
+
+    // 合并 meta
+    if (remote.meta) {
+      result.meta = result.meta || {};
+      result.meta.created = remote.meta.created || (local.meta && local.meta.created) || '';
+      result.meta.streak = Math.max((local.meta && local.meta.streak) || 0, remote.meta.streak || 0);
+      result.meta.lastStreakDate = remote.meta.lastStreakDate || (local.meta && local.meta.lastStreakDate) || '';
+
+      // streakHistory 取并集
+      if (remote.meta.streakHistory) {
+        result.meta.streakHistory = result.meta.streakHistory || {};
+        ['fitness', 'english', 'learning', 'spiritual'].forEach(hk => {
+          const lArr = (local.meta && local.meta.streakHistory && local.meta.streakHistory[hk]) || [];
+          const rArr = (remote.meta.streakHistory && remote.meta.streakHistory[hk]) || [];
+          result.meta.streakHistory[hk] = Array.from(new Set(lArr.concat(rArr))).sort();
+        });
+      }
+
+      if (remote.meta.personalStreaks) {
+        result.meta.personalStreaks = result.meta.personalStreaks || {};
+        ['fitness', 'english', 'learning', 'spiritual'].forEach(pk => {
+          result.meta.personalStreaks[pk] = Math.max(
+            (local.meta && local.meta.personalStreaks && local.meta.personalStreaks[pk]) || 0,
+            remote.meta.personalStreaks[pk] || 0
+          );
+        });
+      }
+    }
+
+    result._syncVersion = Math.max(local._syncVersion || 0, remote._syncVersion || 0);
+    return result;
+  }
+
+  function mergeArrayById(arrA, arrB) {
+    const map = new Map();
+    arrA.forEach(item => { if (item && item.id) map.set(item.id, item); });
+    arrB.forEach(item => {
+      if (!item || !item.id) return;
+      const existing = map.get(item.id);
+      if (!existing) {
+        map.set(item.id, item);
+      } else {
+        const tsA = existing._updated || 0;
+        const tsB = item._updated || 0;
+        if (tsB > tsA) map.set(item.id, item);
+      }
+    });
+    return Array.from(map.values());
+  }
+
+  // ========== 公开 API（保持与旧版兼容） ==========
+
+  /**
+   * 异步加载：本地 → 云端合并
+   * 返回 data
+   */
+  async function load() {
+    // 1. 先加载本地缓存（快速渲染）
+    const hasLocal = loadLocal();
+
+    if (!hasLocal) {
+      // 无本地缓存，尝试从云端加载
+      try {
+        const result = await Supa.loadAppData();
+        if (result && result.data) {
+          data = result.data;
+          cloudVersion = result.updatedAt;
+          saveLocal();
+        } else {
+          data = seed();
+        }
+      } catch (e) {
+        data = seed();
+      }
+    } else {
+      // 有本地缓存，异步拉取云端合并
+      try {
+        const result = await Supa.loadAppData();
+        if (result && result.data && result.updatedAt) {
+          if (!cloudVersion || result.updatedAt > cloudVersion) {
+            data = deepMerge(data, result.data);
+            cloudVersion = result.updatedAt;
+            saveLocal();
+          }
+        }
+      } catch (e) {
+        // 离线模式，使用本地数据
+        console.log('离线模式，使用本地缓存');
+      }
+    }
+
+    // 确保 streakHistory
+    if (!data.meta) data.meta = {};
+    if (!data.meta.streakHistory) {
+      data.meta.streakHistory = { fitness: [], english: [], learning: [], spiritual: [] };
+    }
+
     return data;
   }
 
-  function update(fn) {
-    if (!data) loadLocal();
-    fn(data);
-    save();
+  /**
+   * 同步获取当前数据（所有模块都用这个）
+   */
+  function get() {
+    if (!data) {
+      loadLocal();
+      if (!data) data = seed();
+    }
+    return data;
   }
 
-  // 计算连续打卡天数（从今天往前数，一旦断掉就停）
+  /**
+   * 修改数据 + 自动保存
+   */
+  function update(fn) {
+    if (!data) get();
+    fn(data);
+    data._syncVersion = Date.now();
+    saveLocal();
+    scheduleCloudSave();
+  }
+
+  /**
+   * 保存（本地 + 云端）
+   */
+  function save() {
+    saveLocal();
+    scheduleCloudSave();
+  }
+
+  /**
+   * 通用增删改（均带 _updated 时间戳）
+   */
+  function addItem(collection, item, parent) {
+    update(d => {
+      const arr = parent ? d[parent][collection] : d[collection];
+      arr.unshift({ id: uid(), _updated: now(), ...item });
+    });
+  }
+
+  function removeItem(collection, id, parent) {
+    update(d => {
+      const arr = parent ? d[parent][collection] : d[collection];
+      const idx = arr.findIndex(x => x.id === id);
+      if (idx > -1) arr.splice(idx, 1);
+    });
+  }
+
+  function updateItem(collection, id, patch, parent) {
+    update(d => {
+      const arr = parent ? d[parent][collection] : d[collection];
+      const idx = arr.findIndex(x => x.id === id);
+      if (idx > -1) {
+        Object.assign(arr[idx], patch);
+        arr[idx]._updated = now();
+      }
+    });
+  }
+
+  // 计算连续打卡天数
   function calcStreak(dates) {
     if (!dates || !dates.length) return 0;
     const sorted = [...new Set(dates)].sort().reverse();
@@ -232,9 +407,7 @@ const Store = (function () {
         const dt = new Date(d);
         dt.setDate(dt.getDate() - 1);
         expected = dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0');
-      } else if (d < expected) {
-        break;
-      }
+      } else if (d < expected) break;
     }
     return streak;
   }
@@ -245,35 +418,61 @@ const Store = (function () {
     }
   }
 
-  // 通用增删改（均带 _updated 时间戳）
-  function addItem(collection, item, parent) {
-    update(d => {
-      const arr = parent ? d[parent][collection] : d[collection];
-      arr.unshift({ id: uid(), _updated: now(), ...item });
-    });
+  /**
+   * 获取云端版本时间戳（用于同步状态显示）
+   */
+  function getCloudVersion() {
+    return cloudVersion;
   }
-  function removeItem(collection, id, parent) {
-    update(d => {
-      const arr = parent ? d[parent][collection] : d[collection];
-      const idx = arr.findIndex(x => x.id === id);
-      if (idx > -1) arr.splice(idx, 1);
-    });
+
+  // ========== 数据迁移 ==========
+
+  /**
+   * 检测是否有旧版 localStorage 数据（v3 格式）
+   */
+  function hasLegacyData() {
+    return !!localStorage.getItem('chayil_ceo_data_v3');
   }
-  function updateItem(collection, id, patch, parent) {
-    update(d => {
-      const arr = parent ? d[parent][collection] : d[collection];
-      const idx = arr.findIndex(x => x.id === id);
-      if (idx > -1) {
-        Object.assign(arr[idx], patch);
-        arr[idx]._updated = now();
-      }
-    });
+
+  /**
+   * 获取旧数据
+   */
+  function getLegacyData() {
+    try {
+      const raw = localStorage.getItem('chayil_ceo_data_v3');
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+  }
+
+  /**
+   * 迁移旧数据到当前 Store
+   */
+  function migrateLegacy(legacyData) {
+    if (!legacyData) return;
+    data = deepMerge(data, legacyData);
+    saveLocal();
+    scheduleCloudSave();
   }
 
   return {
-    load, get, update, save, saveLocalOnly, mergeRemote, syncNow,
-    uid, todayStr, addItem, removeItem, updateItem,
-    calcStreak, ensureStreakHistory,
-    seed, KEY
+    load,
+    get,
+    update,
+    save,
+    addItem,
+    removeItem,
+    updateItem,
+    uid,
+    todayStr,
+    calcStreak,
+    ensureStreakHistory,
+    pushNow,
+    pullFromCloud,
+    getCloudVersion,
+    seed,
+    KEY,
+    hasLegacyData,
+    getLegacyData,
+    migrateLegacy,
   };
 })();

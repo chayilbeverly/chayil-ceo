@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Chayil CEO · 登录</title>
+<meta name="theme-color" content="#15151A">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-base: #15151A;
+    --bg-card: #1E1E25;
+    --ink-900: #F5F2EA;
+    --ink-700: #D8D7D2;
+    --ink-500: #9E9EA4;
+    --ink-300: #6B6B70;
+    --gold: #B89358;
+    --gold-soft: #C9A86A;
+    --gold-deep: #8A6E3F;
+    --gold-glow: rgba(184,147,88,0.12);
+    --line: #2A2A2E;
+    --r-sm: 8px;
+    --r-md: 14px;
+    --r-lg: 20px;
+    --ff-serif: 'Cormorant Garamond', 'Noto Serif SC', Georgia, serif;
+    --ff-sans: 'Inter', -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { -webkit-font-smoothing: antialiased; }
+  body {
+    font-family: var(--ff-sans);
+    background: var(--bg-base);
+    color: var(--ink-900);
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .login-wrap {
+    width: 100%;
+    max-width: 400px;
+    text-align: center;
+  }
+  .login-brand {
+    margin-bottom: 40px;
+  }
+  .login-mark {
+    width: 56px; height: 56px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, var(--gold-soft), var(--gold-deep));
+    color: var(--bg-base);
+    font-family: var(--ff-serif);
+    font-size: 30px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 16px;
+  }
+  .login-name {
+    font-family: var(--ff-serif);
+    font-size: 28px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    color: var(--ink-900);
+  }
+  .login-sub {
+    font-size: 12px;
+    letter-spacing: 1.6px;
+    text-transform: uppercase;
+    color: var(--ink-500);
+    margin-top: 6px;
+  }
+  .login-card {
+    background: var(--bg-card);
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+    padding: 32px 28px;
+    text-align: left;
+  }
+  .login-tabs {
+    display: flex;
+    gap: 0;
+    margin-bottom: 24px;
+    border-bottom: 1px solid var(--line);
+  }
+  .login-tab {
+    flex: 1;
+    padding: 10px;
+    text-align: center;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--ink-500);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+    background: none;
+    border-top: none;
+    border-left: none;
+    border-right: none;
+    font-family: inherit;
+  }
+  .login-tab.active {
+    color: var(--gold-soft);
+    border-bottom-color: var(--gold);
+  }
+  .form-group {
+    margin-bottom: 16px;
+  }
+  .form-label {
+    display: block;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    color: var(--ink-500);
+    margin-bottom: 6px;
+  }
+  .form-input {
+    width: 100%;
+    padding: 11px 14px;
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    background: var(--bg-base);
+    color: var(--ink-900);
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+    transition: border 0.2s;
+  }
+  .form-input:focus { border-color: var(--gold); }
+  .btn {
+    width: 100%;
+    padding: 12px;
+    border: none;
+    border-radius: var(--r-sm);
+    font-size: 14px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.3px;
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--gold-soft), var(--gold-deep));
+    color: #fff;
+  }
+  .btn-primary:hover { filter: brightness(1.08); }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+  .login-error {
+    background: rgba(184,84,80,0.1);
+    color: #B85450;
+    padding: 10px 14px;
+    border-radius: var(--r-sm);
+    font-size: 12px;
+    margin-bottom: 16px;
+    display: none;
+    line-height: 1.5;
+  }
+  .login-error.show { display: block; }
+  .login-info {
+    text-align: center;
+    margin-top: 20px;
+    font-size: 11px;
+    color: var(--ink-500);
+    line-height: 1.6;
+  }
+  .login-info a {
+    color: var(--gold-soft);
+    text-decoration: underline;
+  }
+  .spinner {
+    display: inline-block;
+    width: 16px; height: 16px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    vertical-align: middle;
+    margin-right: 6px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div class="login-wrap">
+  <div class="login-brand">
+    <div class="login-mark">C</div>
+    <div class="login-name">Chayil CEO</div>
+    <div class="login-sub">Personal Operating System</div>
+  </div>
+
+  <div class="login-card">
+    <div class="login-tabs">
+      <button class="login-tab active" id="tabLogin">登录</button>
+      <button class="login-tab" id="tabRegister">注册</button>
+    </div>
+
+    <div class="login-error" id="loginError"></div>
+
+    <div id="formLogin">
+      <div class="form-group">
+        <label class="form-label">邮箱</label>
+        <input type="email" class="form-input" id="loginEmail" placeholder="your@email.com" autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label class="form-label">密码</label>
+        <input type="password" class="form-input" id="loginPassword" placeholder="输入密码" autocomplete="current-password">
+      </div>
+      <button class="btn btn-primary" id="btnLogin" onclick="doLogin()">登 录</button>
+    </div>
+
+    <div id="formRegister" style="display:none">
+      <div class="form-group">
+        <label class="form-label">邮箱</label>
+        <input type="email" class="form-input" id="regEmail" placeholder="your@email.com" autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label class="form-label">密码（至少 6 位）</label>
+        <input type="password" class="form-input" id="regPassword" placeholder="至少6位密码" autocomplete="new-password">
+      </div>
+      <button class="btn btn-primary" id="btnRegister" onclick="doRegister()">注 册</button>
+    </div>
+  </div>
+
+  <div class="login-info">
+    使用邮箱注册账号，所有数据云端存储。<br>
+    多设备登录自动同步。
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.min.js"></script>
+<script src="js/supabase.js"></script>
+<script>
+  // Tab 切换
+  var isLogin = true;
+  document.getElementById('tabLogin').addEventListener('click', function () {
+    isLogin = true;
+    document.getElementById('tabLogin').classList.add('active');
+    document.getElementById('tabRegister').classList.remove('active');
+    document.getElementById('formLogin').style.display = 'block';
+    document.getElementById('formRegister').style.display = 'none';
+    hideError();
+  });
+  document.getElementById('tabRegister').addEventListener('click', function () {
+    isLogin = false;
+    document.getElementById('tabRegister').classList.add('active');
+    document.getElementById('tabLogin').classList.remove('active');
+    document.getElementById('formLogin').style.display = 'none';
+    document.getElementById('formRegister').style.display = 'block';
+    hideError();
+  });
+
+  // 回车提交
+  document.getElementById('loginPassword').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') doLogin();
+  });
+  document.getElementById('regPassword').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') doRegister();
+  });
+
+  function showError(msg) {
+    var el = document.getElementById('loginError');
+    el.textContent = msg;
+    el.classList.add('show');
+  }
+
+  function hideError() {
+    document.getElementById('loginError').classList.remove('show');
+  }
+
+  function setLoading(btn, loading) {
+    var el = document.getElementById(btn);
+    if (loading) {
+      el.disabled = true;
+      el.innerHTML = '<span class="spinner"></span>处理中...';
+    } else {
+      el.disabled = false;
+      el.textContent = btn === 'btnLogin' ? '登 录' : '注 册';
+    }
+  }
+
+  async function doLogin() {
+    hideError();
+    var email = document.getElementById('loginEmail').value.trim();
+    var password = document.getElementById('loginPassword').value;
+    if (!email || !password) {
+      showError('请输入邮箱和密码');
+      return;
+    }
+    setLoading('btnLogin', true);
+    try {
+      var result = await Supa.signIn(email, password);
+      if (result.user) {
+        // 登录成功，跳转到主应用
+        window.location.href = 'index.html';
+      }
+    } catch (e) {
+      var msg = e.message || '登录失败';
+      if (msg.indexOf('Invalid login') > -1) msg = '邮箱或密码错误';
+      if (msg.indexOf('Email not confirmed') > -1) msg = '邮箱尚未验证，请检查收件箱';
+      showError(msg);
+    } finally {
+      setLoading('btnLogin', false);
+    }
+  }
+
+  async function doRegister() {
+    hideError();
+    var email = document.getElementById('regEmail').value.trim();
+    var password = document.getElementById('regPassword').value;
+    if (!email || !password) {
+      showError('请输入邮箱和密码');
+      return;
+    }
+    if (password.length < 6) {
+      showError('密码至少需要 6 位字符');
+      return;
+    }
+    setLoading('btnRegister', true);
+    try {
+      var result = await Supa.signUp(email, password);
+      if (result.user) {
+        // 检查是否需要邮箱验证
+        if (result.session) {
+          // 无需验证，直接跳转
+          window.location.href = 'index.html';
+        } else {
+          showError('注册成功！请检查邮箱完成验证后再登录。');
+          // 切换到登录 Tab
+          document.getElementById('tabLogin').click();
+        }
+      }
+    } catch (e) {
+      var msg = e.message || '注册失败';
+      if (msg.indexOf('already registered') > -1 || msg.indexOf('already exists') > -1) {
+        msg = '该邮箱已注册，请直接登录';
+      }
+      showError(msg);
+    } finally {
+      setLoading('btnRegister', false);
+    }
+  }
+
+  // 如果已登录，直接跳转
+  (async function () {
+    try {
+      var session = await Supa.getSession();
+      if (session) {
+        window.location.href = 'index.html';
+      }
+    } catch (e) { /* 未登录，留在登录页 */ }
+  })();
+</script>
+</body>
+</html>
