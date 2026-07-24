@@ -135,9 +135,9 @@ const Supa = (function () {
     const sb = getClient();
     const uid = getUserId();
     if (!sb || !uid || !tasks) return false;
-    if (!tasks.length) { console.log('[saveTasks] 任务列表为空，跳过'); return true; }
     const rows = tasks.map(taskToRow);
     console.log('[saveTasks] 准备 upsert', rows.length, '条任务, user_id:', uid);
+    if (!rows.length) { console.log('[saveTasks] 任务列表为空，跳过'); return true; }
     // 分批 UPSERT（每批最多 50 条）
     let allOk = true;
     for (let i = 0; i < rows.length; i += 50) {
@@ -145,6 +145,9 @@ const Supa = (function () {
       const { error } = await sb.from('tasks').upsert(batch, { onConflict: 'user_id,local_id' });
       if (error) { console.error('[saveTasks] upsert 失败:', error); allOk = false; }
     }
+    // 清理云端已删除/已去重的任务
+    const localIds = tasks.map(t => t.id);
+    await deleteTasksNotIn(localIds);
     console.log('[saveTasks] 完成, 共', rows.length, '条, 状态:', allOk ? 'OK' : 'FAILED');
     return allOk;
   }

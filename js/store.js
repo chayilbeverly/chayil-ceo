@@ -196,12 +196,19 @@ const Store = (function () {
       // 指纹对比：合并前后是否真的有数据变化
       const fpBefore = dataFingerprint(data);
       data = deepMerge(data, remoteData);
+      deduplicateAll(data);
       saveLocal();
       const fpAfter = dataFingerprint(data);
 
       if (fpAfter !== fpBefore) {
         cloudUpdatedAt = new Date().toISOString();
         console.log('[pullFromCloud] ✅ 有新数据 (指纹变化), time:', cloudUpdatedAt);
+        // 如果去重移除了条目，推送清理后的数据到云端
+        const fpDedup = dataFingerprint(data);
+        if (fpDedup !== fpAfter) {
+          console.log('[pullFromCloud] 去重后有变化，推送清理数据');
+          setTimeout(() => pushNow(), 500);
+        }
         return true;
       }
       console.log('[pullFromCloud] 指纹未变，跳过');
