@@ -1471,3 +1471,253 @@ ul { list-style: none; }
 @media (max-width: 860px) {
   .top-three-mini { flex-direction: column; }
 }
+
+/* ============================================
+   PWA 移动端底部导航 & 手机优化
+   ============================================ */
+
+/* 移动端底部导航栏 */
+.mobile-nav {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  background: var(--bg-card);
+  border-top: 1px solid var(--line);
+  padding: 6px 0 env(safe-area-inset-bottom, 8px);
+  justify-content: space-around;
+  align-items: center;
+  box-shadow: 0 -2px 12px rgba(28,28,30,0.06);
+}
+
+.mnav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 12px;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  transition: all 0.2s;
+  color: var(--ink-400);
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+.mnav-item:active {
+  background: var(--bg-hover);
+  transform: scale(0.95);
+}
+
+.mnav-item.active {
+  color: var(--gold-deep);
+}
+
+.mnav-icon {
+  font-size: 20px;
+  line-height: 1;
+  transition: transform 0.2s;
+}
+
+.mnav-item.active .mnav-icon {
+  transform: translateY(-2px);
+}
+
+.mnav-label {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+}
+
+/* 手机端布局 */
+@media (max-width: 768px) {
+  /* 显示底部导航 */
+  .mobile-nav {
+    display: flex;
+  }
+
+  /* 隐藏侧边栏 */
+  .sidebar {
+    display: none;
+  }
+
+  /* 主内容区全宽 */
+  .main {
+    margin-left: 0 !important;
+    padding: 12px 12px 80px; /* 底部留空间给导航 */
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+
+  /* 顶部栏简化 */
+  .topbar {
+    padding: 12px 0;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .page-title {
+    font-size: 18px;
+  }
+
+  .page-date {
+    font-size: 11px;
+  }
+
+  /* 数据卡片 2 列 */
+  .cockpit-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  .cockpit-card {
+    padding: 14px;
+  }
+
+  .cockpit-value {
+    font-size: 22px;
+  }
+
+  /* 任务列表 */
+  .board {
+    gap: 12px;
+  }
+
+  .board-col {
+    min-width: 100%;
+  }
+
+  /* 表单全宽 */
+  .form-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .form-grid.two {
+    grid-template-columns: 1fr;
+  }
+
+  /* 按钮更大（方便手指点击） */
+  .btn {
+    min-height: 40px;
+    padding: 10px 18px;
+    font-size: 14px;
+  }
+
+  .btn-sm {
+    min-height: 36px;
+    padding: 8px 14px;
+    font-size: 13px;
+  }
+
+  /* 模态窗口全屏 */
+  .modal {
+    width: 95vw;
+    max-width: none;
+    margin: 20px auto;
+    max-height: 85vh;
+    border-radius: var(--r-md);
+  }
+
+  /* 输入框更大 */
+  .form-input, .form-textarea, .form-select, .input {
+    font-size: 16px; /* 防止iOS缩放 */
+    padding: 10px 14px;
+  }
+
+  /* 表格横向滚动 */
+  .data-table {
+    font-size: 12px;
+  }
+
+  .data-table th,
+  .data-table td {
+    padding: 8px 10px;
+    white-space: nowrap;
+  }
+
+  /* 打卡区域 */
+  .streak-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  /* 复盘卡片 */
+  .cr-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  /* AI 拆解 */
+  .ai-breakdown-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* tab 横向滚动 */
+  .tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    gap: 4px;
+  }
+
+  .tab {
+    flex-shrink: 0;
+    padding: 8px 14px;
+    font-size: 13px;
+  }
+
+  /* PWA standalone 模式：顶部安全区域 */
+  @supports (padding-top: env(safe-area-inset-top)) {
+    .main {
+      padding-top: calc(12px + env(safe-area-inset-top));
+    }
+  }
+}
+
+/* 极小屏幕 (iPhone SE 等) */
+@media (max-width: 380px) {
+  .cockpit-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .cockpit-card {
+    padding: 10px;
+  }
+
+  .cockpit-value {
+    font-size: 18px;
+  }
+
+  .cockpit-label {
+    font-size: 11px;
+  }
+
+  .mnav-item {
+    padding: 4px 8px;
+  }
+
+  .mnav-icon {
+    font-size: 18px;
+  }
+
+  .mnav-label {
+    font-size: 9px;
+  }
+}
+
+/* PWA standalone 特定样式 */
+@media (display-mode: standalone) {
+  /* 隐藏浏览器UI后，顶部无工具栏 */
+  .topbar {
+    padding-top: calc(12px + env(safe-area-inset-top, 0px));
+  }
+
+  /* 下拉刷新禁用（避免误触） */
+  body {
+    overscroll-behavior-y: contain;
+  }
+}

@@ -1,7 +1,6 @@
 /* ============================================
-   Chayil CEO OS — Cloud Sync v2
-   真正的双端实时同步：push前先pull合并、深度合并、
-   轮询间隔12s、页面聚焦时立即拉取
+   Chayil CEO OS — Cloud Sync v3
+   UTF-8 安全编码 + 乱码数据自动修复 + 实时同步
    ============================================ */
 
 const Sync = (function () {
@@ -9,14 +8,35 @@ const Sync = (function () {
   const DATA_PATH = 'data/chayil-data.json';
   const TOKEN_KEY = 'chayil_gh_token';
   const BRANCH = 'main';
-  const POLL_INTERVAL = 12000; // 12 秒轮询
+  const POLL_INTERVAL = 12000;
 
-  let status = 'idle'; // idle | pulling | pushing | error | ok
+  let status = 'idle';
   let lastSyncTime = null;
   let pushDebounceTimer = null;
   let pollTimer = null;
   let onStatusChange = null;
-  let onRemoteUpdate = null; // 回调：云端有新数据时通知 App 刷新
+  let onRemoteUpdate = null;
+
+  // ========== UTF-8 安全的 Base64 编码 ==========
+
+  /** 字符串 → UTF-8 字节 → Base64（安全处理中文/emoji/特殊字符） */
+  function strToBase64(str) {
+    const encoder = new TextEncoder();
+    const bytes = encoder.encode(str);
+    const binStr = Array.from(bytes, function (b) { return String.fromCharCode(b); }).join('');
+    return btoa(binStr);
+  }
+
+  /** Base64 → UTF-8 字节 → 字符串（安全还原中文/emoji/特殊字符） */
+  function base64ToStr(b64) {
+    const binStr = atob(b64);
+    const len = binStr.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+      bytes[i] = binStr.charCodeAt(i);
+    }
+    return new TextDecoder('utf-8').decode(bytes);
+  }
 
   // ========== Token 管理 ==========
 
@@ -53,7 +73,7 @@ const Sync = (function () {
       },
     };
     if (body) {
-      opts.headers['Content-Type'] = 'application/json';
+      opts.headers['Content-Type'] = 'application/json; charset=utf-8';
       opts.body = JSON.stringify(body);
     }
     const res = await fetch('https://api.github.com' + path, opts);
@@ -64,50 +84,127 @@ const Sync = (function () {
     return res.json();
   }
 
-  // ========== 深度合并 ==========
+  // ========== 乱码检测 ==========
 
   /**
-   * 智能合并两份数据：
-   * - 对带 id 的数组：以 id 为键合并，_updated 时间戳大的赢
-   * - 对日期字符串数组（streakHistory）：去重合并
-   * - 对 topThree：取较新的
-   * - 其他字段：取 _syncVersion 高的
+   * 检测字符串是否为 UTF-8 双重/多重编码乱码
+   * 乱码特征：包含大量 Latin-1 高位字节（0x80-0xFF）但不成有效中文
+   * 或者出现 Â/Ã 等典型的错编码前缀字符
    */
+  function isGarbled(str) {
+    if (!str || typeof str !== 'string') return false;
+    // 纯 ASCII 不是乱码
+    if (/^[\x00-\x7F\s]*$/.test(str)) return false;
+    // 包含正常中文字符（CJK统一表意文字）→ 不是乱码
+    if (/[\u4E00-\u9FFF\u3400-\u4DBF]/.test(str)) return false;
+    // 检查是否为典型的 UTF-8 错编码特征：
+    // Â (U+00C2) 或 Ã (U+00C3) 常出现在双重编码的 UTF-8 中
+    if (/[\u00C0-\u00FF]{3,}/.test(str)) return true;
+    // 连续出现 è/é/ê/ë (U+00E8-U+00EB) 等字符
+    if (/[\u00C0-\u00FF][\u00C0-\u00FF]/.test(str)) return true;
+    return false;
+  }
+
+  /**
+   * 递归扫描对象中的所有字符串字段，检测并标记乱码
+   */
+  function scanGarbled(obj) {
+    let count = 0;
+    function scan(o) {
+      if (!o || typeof o !== 'object') return;
+      if (Array.isArray(o)) {
+        o.forEach(function (item) { scan(item); });
+        return;
+      }
+      for (var key in o) {
+        if (!o.hasOwnProperty(key)) continue;
+        var val = o[key];
+        if (typeof val === 'string' && isGarbled(val)) {
+          count++;
+          o._hasGarbled = true;
+        } else if (typeof val === 'object') {
+          scan(val);
+        }
+      }
+    }
+    scan(obj);
+    return count;
+  }
+
+  /**
+   * 递归修复对象中的乱码字段
+   * 尝试将 Latin-1 错编码的 UTF-8 字节还原为正确的 UTF-8 字符串
+   */
+  function repairGarbledData(obj) {
+    var repaired = 0;
+
+    function repair(o) {
+      if (!o || typeof o !== 'object') return;
+      if (Array.isArray(o)) {
+        o.forEach(function (item) { repair(item); });
+        return;
+      }
+      for (var key in o) {
+        if (!o.hasOwnProperty(key)) continue;
+        var val = o[key];
+        if (typeof val === 'string' && isGarbled(val)) {
+          try {
+            // 尝试修复：将每个字符的 charCode 当作 UTF-8 字节重新解码
+            var bytes = new Uint8Array(val.length);
+            for (var i = 0; i < val.length; i++) {
+              bytes[i] = val.charCodeAt(i) & 0xFF;
+            }
+            var fixed = new TextDecoder('utf-8').decode(bytes);
+            // 验证修复结果：应包含正常中文
+            if (/[\u4E00-\u9FFF]/.test(fixed)) {
+              o[key] = fixed;
+              repaired++;
+            }
+          } catch (e) { /* 无法修复则保留原值 */ }
+        } else if (typeof val === 'object') {
+          repair(val);
+        }
+      }
+      // 清除标记
+      delete o._hasGarbled;
+    }
+
+    repair(obj);
+    return repaired;
+  }
+
+  // ========== 深度合并 ==========
+
   function deepMerge(local, remote) {
     if (!remote) return local;
     if (!local) return remote;
 
-    const result = { ...local };
+    var result = JSON.parse(JSON.stringify(local));
+    var base = (remote._syncVersion || 0) >= (local._syncVersion || 0) ? remote : local;
+    var other = base === remote ? local : remote;
 
-    // 以版本号高的为基础
-    const base = (remote._syncVersion || 0) >= (local._syncVersion || 0) ? remote : local;
-    const other = base === remote ? local : remote;
+    var idArrays = ['inspirations', 'radar', 'reviews'];
 
-    // --- 合并 id 数组 ---
-    const idArrays = [
-      'inspirations', 'radar', 'reviews',
-    ];
-
-    for (const key of idArrays) {
+    for (var i = 0; i < idArrays.length; i++) {
+      var key = idArrays[i];
       result[key] = mergeArrayById(local[key] || [], remote[key] || []);
     }
 
-    // --- tasks ---
     if (local.tasks || remote.tasks) {
-      result.tasks = { ...(base.tasks || {}) };
-      for (const sub of ['personalGrowth', 'business', 'contentGrowth']) {
+      result.tasks = JSON.parse(JSON.stringify(base.tasks || {}));
+      var taskSubs = ['personalGrowth', 'business', 'contentGrowth'];
+      for (var ti = 0; ti < taskSubs.length; ti++) {
+        var sub = taskSubs[ti];
         result.tasks[sub] = mergeArrayById(
           (local.tasks && local.tasks[sub]) || [],
           (remote.tasks && remote.tasks[sub]) || []
         );
       }
-      // topThree：取较新的
       result.tasks.topThree = base.tasks.topThree || other.tasks.topThree || [];
     }
 
-    // --- finance ---
     if (local.finance || remote.finance) {
-      result.finance = { ...(base.finance || {}) };
+      result.finance = JSON.parse(JSON.stringify(base.finance || {}));
       result.finance.income = mergeArrayById(
         (local.finance && local.finance.income) || [],
         (remote.finance && remote.finance.income) || []
@@ -119,43 +216,43 @@ const Sync = (function () {
       result.finance.dailyTarget = base.finance ? base.finance.dailyTarget : (other.finance ? other.finance.dailyTarget : 4000);
     }
 
-    // --- assets ---
     if (local.assets || remote.assets) {
-      result.assets = { ...(base.assets || {}) };
-      for (const sub of ['customers', 'products', 'deals', 'contentAssets']) {
-        result.assets[sub] = mergeArrayById(
-          (local.assets && local.assets[sub]) || [],
-          (remote.assets && remote.assets[sub]) || []
+      result.assets = JSON.parse(JSON.stringify(base.assets || {}));
+      var assetSubs = ['customers', 'products', 'deals', 'contentAssets'];
+      for (var ai = 0; ai < assetSubs.length; ai++) {
+        var asub = assetSubs[ai];
+        result.assets[asub] = mergeArrayById(
+          (local.assets && local.assets[asub]) || [],
+          (remote.assets && remote.assets[asub]) || []
         );
       }
     }
 
-    // --- meta ---
     if (local.meta || remote.meta) {
-      result.meta = { ...(base.meta || {}) };
+      result.meta = JSON.parse(JSON.stringify(base.meta || {}));
       result.meta.created = base.meta.created || other.meta.created || '';
       result.meta.streak = Math.max(base.meta.streak || 0, other.meta.streak || 0);
       result.meta.lastStreakDate = base.meta.lastStreakDate || other.meta.lastStreakDate || '';
 
-      // streakHistory：日期数组去重合并
-      if (local.meta && local.meta.streakHistory || remote.meta && remote.meta.streakHistory) {
+      if ((local.meta && local.meta.streakHistory) || (remote.meta && remote.meta.streakHistory)) {
         result.meta.streakHistory = {};
-        const keys = ['fitness', 'english', 'learning', 'spiritual'];
-        for (const k of keys) {
-          const lArr = (local.meta && local.meta.streakHistory && local.meta.streakHistory[k]) || [];
-          const rArr = (remote.meta && remote.meta.streakHistory && remote.meta.streakHistory[k]) || [];
-          result.meta.streakHistory[k] = [...new Set([...lArr, ...rArr])].sort();
+        var histKeys = ['fitness', 'english', 'learning', 'spiritual'];
+        for (var hi = 0; hi < histKeys.length; hi++) {
+          var hk = histKeys[hi];
+          var lArr = (local.meta && local.meta.streakHistory && local.meta.streakHistory[hk]) || [];
+          var rArr = (remote.meta && remote.meta.streakHistory && remote.meta.streakHistory[hk]) || [];
+          result.meta.streakHistory[hk] = Array.from(new Set(lArr.concat(rArr))).sort();
         }
       }
 
-      // personalStreaks：取较大值
-      if (local.meta && local.meta.personalStreaks || remote.meta && remote.meta.personalStreaks) {
+      if ((local.meta && local.meta.personalStreaks) || (remote.meta && remote.meta.personalStreaks)) {
         result.meta.personalStreaks = {};
-        const keys = ['fitness', 'english', 'learning', 'spiritual'];
-        for (const k of keys) {
-          const lv = (local.meta && local.meta.personalStreaks && local.meta.personalStreaks[k]) || 0;
-          const rv = (remote.meta && remote.meta.personalStreaks && remote.meta.personalStreaks[k]) || 0;
-          result.meta.personalStreaks[k] = Math.max(lv, rv);
+        var psKeys = ['fitness', 'english', 'learning', 'spiritual'];
+        for (var pi = 0; pi < psKeys.length; pi++) {
+          var pk = psKeys[pi];
+          var lv = (local.meta && local.meta.personalStreaks && local.meta.personalStreaks[pk]) || 0;
+          var rv = (remote.meta && remote.meta.personalStreaks && remote.meta.personalStreaks[pk]) || 0;
+          result.meta.personalStreaks[pk] = Math.max(lv, rv);
         }
       }
     }
@@ -164,87 +261,109 @@ const Sync = (function () {
     return result;
   }
 
-  /**
-   * 按 id 合并两个数组
-   * - 同 id 的两条记录：_updated 时间戳大的赢
-   * - 仅一方有的记录：保留
-   */
   function mergeArrayById(arrA, arrB) {
-    const map = new Map();
-    for (const item of arrA) {
-      if (item && item.id) map.set(item.id, item);
-    }
-    for (const item of arrB) {
-      if (!item || !item.id) continue;
-      const existing = map.get(item.id);
-      if (!existing) {
-        map.set(item.id, item);
-      } else {
-        // 两边都有：_updated 时间戳大的赢
-        const tsA = existing._updated || 0;
-        const tsB = item._updated || 0;
-        if (tsB > tsA) map.set(item.id, item);
+    var map = new Map();
+    for (var i = 0; i < arrA.length; i++) {
+      var item = arrA[i];
+      if (item && item.id) {
+        // 跳过乱码条目（让干净版本优先）
+        var hasGarbled = false;
+        for (var k in item) {
+          if (typeof item[k] === 'string' && isGarbled(item[k])) {
+            hasGarbled = true;
+            break;
+          }
+        }
+        if (!hasGarbled) map.set(item.id, item);
       }
     }
-    return [...map.values()];
+    for (var j = 0; j < arrB.length; j++) {
+      var itemB = arrB[j];
+      if (!itemB || !itemB.id) continue;
+      // 检查当前条目是否乱码
+      var bGarbled = false;
+      for (var bk in itemB) {
+        if (typeof itemB[bk] === 'string' && isGarbled(itemB[bk])) {
+          bGarbled = true;
+          break;
+        }
+      }
+      if (bGarbled) continue; // 跳过乱码条目
+
+      var existing = map.get(itemB.id);
+      if (!existing) {
+        map.set(itemB.id, itemB);
+      } else {
+        var tsA = existing._updated || 0;
+        var tsB = itemB._updated || 0;
+        if (tsB > tsA) map.set(itemB.id, itemB);
+      }
+    }
+    return Array.from(map.values());
   }
 
   // ========== 拉取 & 推送 ==========
 
-  /** 从 GitHub 拉取最新数据（不解码，返回原始 JSON 对象） */
   async function pullRaw() {
     try {
-      const file = await api('/repos/' + REPO + '/contents/' + DATA_PATH + '?ref=' + BRANCH + '&t=' + Date.now(), 'GET');
-      const content = atob(file.content);
-      const data = JSON.parse(content);
-      return { data, sha: file.sha };
+      var file = await api('/repos/' + REPO + '/contents/' + DATA_PATH + '?ref=' + BRANCH + '&t=' + Date.now(), 'GET');
+      // 使用 UTF-8 安全的 base64 解码
+      var content = base64ToStr(file.content);
+      var data = JSON.parse(content);
+
+      // 检测并修复乱码
+      var garbledCount = scanGarbled(data);
+      if (garbledCount > 0) {
+        console.warn('⚠ 检测到 ' + garbledCount + ' 处乱码，尝试自动修复...');
+        var repaired = repairGarbledData(data);
+        console.log('✅ 已修复 ' + repaired + ' 处乱码');
+      }
+
+      return { data: data, sha: file.sha };
     } catch (e) {
       if (e.message === 'NO_TOKEN') throw e;
-      if (e.message && e.message.includes('Not Found')) return null; // 文件还不存在
+      if (e.message && e.message.indexOf('Not Found') > -1) return null;
       console.warn('Sync pull failed:', e.message);
       return null;
     }
   }
 
-  /** 拉取并深度合并到本地数据，返回合并后的新数据 */
   function pullAndMerge(localData) {
-    return pullRaw().then(result => {
+    return pullRaw().then(function (result) {
       if (!result) return localData;
       setStatus('pulling');
       lastSyncTime = new Date().toISOString();
-      const merged = deepMerge(localData, result.data);
+      var merged = deepMerge(localData, result.data);
       merged._remoteSHA = result.sha;
       setStatus('ok');
       return merged;
-    }).catch(e => {
+    }).catch(function (e) {
       if (e.message !== 'NO_TOKEN') setStatus('error');
       return localData;
     });
   }
 
-  /** 推送到 GitHub（先拉取合并，再推送） */
   async function push(data) {
     if (!hasToken()) return false;
     setStatus('pushing');
     try {
-      // 1. 先拉取远程最新版本
-      let sha = null;
+      var sha = null;
       try {
-        const raw = await pullRaw();
+        var raw = await pullRaw();
         if (raw && raw.data) {
-          // 远程有数据，深度合并
           data = deepMerge(data, raw.data);
           sha = raw.sha;
         }
-      } catch (e) {
-        // 远程文件不存在，sha 保持 null（会创建新文件）
-      }
+      } catch (e) { /* 远程文件不存在 */ }
 
-      // 2. 推送合并后的数据
-      const content = btoa(unescape(encodeURIComponent(JSON.stringify(data, null, 2))));
-      const body = {
+      // 推送前本地再修复一次乱码
+      repairGarbledData(data);
+
+      // 使用 UTF-8 安全的 base64 编码
+      var content = strToBase64(JSON.stringify(data, null, 2));
+      var body = {
         message: 'chore: sync app data [' + new Date().toLocaleString('zh-CN') + ']',
-        content,
+        content: content,
         branch: BRANCH,
       };
       if (sha) body.sha = sha;
@@ -262,10 +381,9 @@ const Sync = (function () {
 
   // ========== 防抖推送 & 轮询 ==========
 
-  /** 防抖推送：等 3 秒无新操作后，先拉取合并再推送 */
   function debouncePush(data) {
     clearTimeout(pushDebounceTimer);
-    pushDebounceTimer = setTimeout(() => push(data), 3000);
+    pushDebounceTimer = setTimeout(function () { push(data); }, 3000);
   }
 
   function pushNow(data) {
@@ -273,19 +391,17 @@ const Sync = (function () {
     return push(data);
   }
 
-  /** 启动定时轮询（检查远程是否有新数据） */
   function startPolling(getLocalDataFn) {
     stopPolling();
-    pollTimer = setInterval(async () => {
+    pollTimer = setInterval(async function () {
       if (!hasToken()) return;
       try {
-        const result = await pullRaw();
+        var result = await pullRaw();
         if (result && result.data) {
-          const localData = getLocalDataFn();
-          const localVer = localData._syncVersion || 0;
-          const remoteVer = result.data._syncVersion || 0;
+          var localData = getLocalDataFn();
+          var localVer = localData._syncVersion || 0;
+          var remoteVer = result.data._syncVersion || 0;
           if (remoteVer > localVer) {
-            // 远程有新数据，通知 App 合并
             if (onRemoteUpdate) {
               onRemoteUpdate(result.data);
             }
@@ -315,17 +431,31 @@ const Sync = (function () {
     onStatusChange = cb;
   }
 
-  /** 注册远程更新回调：当轮询发现远程版本更新时触发 */
   function onRemoteUpdateCallback(cb) {
     onRemoteUpdate = cb;
   }
 
   return {
-    init, pullRaw, pullAndMerge, push, pushNow, debouncePush,
-    startPolling, stopPolling,
-    getToken, setToken, hasToken,
-    getStatus, getLastSync, onChange,
-    onRemoteUpdateCallback,
-    deepMerge, // 暴露给外部使用
+    init: init,
+    pullRaw: pullRaw,
+    pullAndMerge: pullAndMerge,
+    push: push,
+    pushNow: pushNow,
+    debouncePush: debouncePush,
+    startPolling: startPolling,
+    stopPolling: stopPolling,
+    getToken: getToken,
+    setToken: setToken,
+    hasToken: hasToken,
+    getStatus: getStatus,
+    getLastSync: getLastSync,
+    onChange: onChange,
+    onRemoteUpdateCallback: onRemoteUpdateCallback,
+    deepMerge: deepMerge,
+    isGarbled: isGarbled,
+    scanGarbled: scanGarbled,
+    repairGarbledData: repairGarbledData,
+    strToBase64: strToBase64,
+    base64ToStr: base64ToStr
   };
 })();

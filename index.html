@@ -2,8 +2,23 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Chayil · Personal CEO Operating System</title>
+
+<!-- PWA Meta -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Chayil">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#1A1A2E">
+<meta name="description" content="个人创业者的商业操作系统">
+
+<!-- PWA Manifest & Icons -->
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" sizes="192x192" href="icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -125,7 +140,7 @@
         <input type="password" class="input" id="syncTokenInput" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
         <div class="form-hint">
           <a href="https://github.com/settings/tokens/new?scopes=repo&description=Chayil%20CEO%20Sync" target="_blank" style="color:var(--gold-deep);text-decoration:underline;">点此创建 Token →</a>
-          勾选 <b>repo</b> 权限，生成后粘贴到上方。
+          勾选 <b>repo</b> 权限，<b style="color:var(--red)">Expiration 选 "No expiration"</b> 避免30天过期，生成后粘贴到上方。
         </div>
       </div>
       <div style="display:flex;gap:10px;margin-top:16px;">
@@ -135,6 +150,30 @@
     </div>
   </div>
 </div>
+
+<!-- 移动端底部导航栏 -->
+<nav class="mobile-nav" id="mobileNav">
+  <a class="mnav-item active" data-mroute="home">
+    <span class="mnav-icon">◈</span>
+    <span class="mnav-label">首页</span>
+  </a>
+  <a class="mnav-item" data-mroute="daily-plan">
+    <span class="mnav-icon">◆</span>
+    <span class="mnav-label">任务</span>
+  </a>
+  <a class="mnav-item" data-mroute="assets">
+    <span class="mnav-icon">◈</span>
+    <span class="mnav-label">客户</span>
+  </a>
+  <a class="mnav-item" data-mroute="inspiration">
+    <span class="mnav-icon">✦</span>
+    <span class="mnav-label">内容</span>
+  </a>
+  <a class="mnav-item" id="mnavSync">
+    <span class="mnav-icon">☁</span>
+    <span class="mnav-label">同步</span>
+  </a>
+</nav>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="js/sync.js"></script>
@@ -149,5 +188,20 @@
 <script src="js/modules/assets.js"></script>
 <script src="js/modules/english.js"></script>
 <script src="js/app.js"></script>
+
+<!-- 注册 Service Worker -->
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('service-worker.js', { scope: '/chayil-ceo/' })
+      .then(function (reg) {
+        console.log('[PWA] Service Worker 已注册:', reg.scope);
+      })
+      .catch(function (err) {
+        console.warn('[PWA] Service Worker 注册失败:', err);
+      });
+  });
+}
+</script>
 </body>
 </html>

@@ -144,6 +144,17 @@ const Store = (function () {
       }
     }
 
+    // 加载后自动检测并修复乱码
+    if (typeof Sync !== 'undefined' && Sync.isGarbled) {
+      const garbled = Sync.scanGarbled(data);
+      if (garbled > 0) {
+        console.warn('⚠ 本地数据检测到 ' + garbled + ' 处乱码，自动修复...');
+        const repaired = Sync.repairGarbledData(data);
+        console.log('✅ 本地已修复 ' + repaired + ' 处乱码');
+        saveLocalOnly();
+      }
+    }
+
     return data;
   }
 
@@ -167,6 +178,11 @@ const Store = (function () {
     const localVer = data._syncVersion || 0;
     const remoteVer = remoteData._syncVersion || 0;
     if (remoteVer <= localVer) return false;
+
+    // 修复远程数据中的乱码
+    if (typeof Sync !== 'undefined' && Sync.repairGarbledData) {
+      Sync.repairGarbledData(remoteData);
+    }
 
     data = Sync.deepMerge(data, remoteData);
     saveLocalOnly();

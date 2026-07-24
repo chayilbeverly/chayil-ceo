@@ -235,12 +235,39 @@ const App = {
         this.route(route);
       });
     });
+
+    // 移动端底部导航
+    document.querySelectorAll('.mnav-item[data-mroute]').forEach(item => {
+      item.addEventListener('click', () => {
+        const route = item.dataset.mroute;
+        this.route(route);
+      });
+    });
+
+    // 移动端同步按钮
+    const mnavSync = document.getElementById('mnavSync');
+    if (mnavSync) {
+      mnavSync.addEventListener('click', () => {
+        if (Sync.hasToken()) {
+          Store.syncNow().then(() => {
+            this.renderSyncStatus();
+            this.renderStreak();
+            this.route(this.current);
+            UI.toast('同步完成');
+          });
+        } else {
+          this.openSyncModal();
+        }
+      });
+    }
   },
 
   route(name) {
     if (!this.routes[name]) return;
     this.current = name;
     document.querySelectorAll('.nav-item').forEach(i => i.classList.toggle('active', i.dataset.route === name));
+    // 同步移动端底部导航
+    document.querySelectorAll('.mnav-item[data-mroute]').forEach(i => i.classList.toggle('active', i.dataset.mroute === name));
     document.getElementById('pageTitle').textContent = this.routes[name].title;
 
     const container = document.getElementById('viewContainer');
