@@ -25,7 +25,9 @@
     }
   },
   "tasks": {
-    "topThree": [],
+    "topThree": [
+      "id_1784872777774_1153"
+    ],
     "personalGrowth": [
       {
         "id": "id_1784872677428_2453",
@@ -74,7 +76,8 @@
         "text": "å¥èº« 2å°æ¶",
         "done": false,
         "time": "06:30",
-        "priority": "high"
+        "priority": "high",
+        "_updated": 1784875082781
       },
       {
         "id": "id_1784872777774_4637",
@@ -963,5 +966,5 @@
       2
     ]
   },
-  "_syncVersion": 1784875059076
+  "_syncVersion": 1784875082782
 }
