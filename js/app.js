@@ -1,12 +1,13 @@
 /* ============================================
-   Chayil CEO OS — Main App
+   Chayil CEO OS — Main App v3
    路由 / 导航 / CEO 日报
    ============================================ */
 
 const App = {
-  current: 'daily-plan',
+  current: 'home',
 
   routes: {
+    'home': { title: 'CEO 驾驶舱', module: 'home' },
     'daily-plan': { title: '每日计划', module: 'dailyPlan' },
     'inspiration': { title: '灵感中心', module: 'inspiration' },
     'radar': { title: '爆款雷达', module: 'radar' },
@@ -18,13 +19,13 @@ const App = {
 
   init() {
     Store.load();
-    // 预填充灵感与爆款数据，确保CEO日报有内容
+    // 预填充灵感与爆款数据
     Store.update(data => {
       if ((!data.inspirations || !data.inspirations.length) && typeof INSPIRATION_SEED !== 'undefined') {
-        data.inspirations = INSPIRATION_SEED.map(s => ({ id: Store.uid(), ...s, date: Store.todayStr() }));
+        data.inspirations = INSPIRATION_SEED.map(s => ({ id: Store.uid(), ...s, date: Store.todayStr(), category: s.category || '创业', status: 'pending' }));
       }
       if ((!data.radar || !data.radar.length) && typeof RADAR_SEED !== 'undefined') {
-        data.radar = RADAR_SEED.map(s => ({ id: Store.uid(), ...s, date: Store.todayStr() }));
+        data.radar = RADAR_SEED.map(s => ({ id: Store.uid(), ...s, date: Store.todayStr(), bookmarked: false, emotionPoint: s.emotionPoint || '', myAdaptation: s.myAdaptation || '' }));
       }
     });
     this.bindNav();
@@ -34,7 +35,6 @@ const App = {
 
     document.getElementById('ceoReportBtn').addEventListener('click', () => this.openCeoModal());
 
-    // 点击遮罩关闭弹窗
     document.getElementById('ceoModal').addEventListener('click', e => {
       if (e.target.id === 'ceoModal') this.closeCeoModal();
     });
@@ -73,13 +73,13 @@ const App = {
 
   renderStreak() {
     const d = Store.get();
-    document.getElementById('sidebarStreak').textContent = d.meta.streak || 0;
+    const streaks = d.meta.personalStreaks || {};
+    const max = Math.max(streaks.fitness || 0, streaks.english || 0, streaks.learning || 0, streaks.spiritual || 0);
+    document.getElementById('sidebarStreak').textContent = max || 0;
   },
 
-  // CEO 每日日报
   openCeoModal() {
     const d = Store.get();
-    const modal = document.getElementById('ceoModal');
     const body = document.getElementById('ceoModalBody');
     const dateTitle = document.getElementById('ceoDateTitle');
 
@@ -91,22 +91,20 @@ const App = {
     else if (hour >= 18) greeting = '晚安';
     dateTitle.textContent = 'Chayil ' + greeting;
 
-    // 今日任务重点
+    const today = Store.todayStr();
+    const month = today.slice(0, 7);
     const allTasks = [...d.tasks.personalGrowth, ...d.tasks.business, ...d.tasks.contentGrowth];
     const undone = allTasks.filter(t => !t.done).slice(0, 5);
-
-    // 今日收入
-    const today = Store.todayStr();
     const todayIncome = d.finance.income.filter(i => i.date === today).reduce((s, i) => s + (+i.amount || 0), 0);
     const todayExpense = d.finance.expense.filter(e => e.date === today).reduce((s, e) => s + (+e.amount || 0), 0);
-
-    // 爆款
+    const monthIncome = d.finance.income.filter(i => i.date.startsWith(month)).reduce((s, i) => s + (+i.amount || 0), 0);
+    const monthProfit = monthIncome - d.finance.expense.filter(e => e.date.startsWith(month)).reduce((s, e) => s + (+e.amount || 0), 0);
     const radar = d.radar || [];
     const topRadar = radar[0];
-
-    // 选题
     const topics = d.inspirations || [];
     const topTopic = topics[0];
+    const dailyTarget = d.finance.dailyTarget || 4000;
+    const targetGap = dailyTarget - todayIncome;
 
     body.innerHTML = `
       <div class="ceo-section">
@@ -121,8 +119,9 @@ const App = {
         <div class="ceo-section-body">
           <ul>
             <li>今日收入 <b style="color:var(--green)">${UI.money(todayIncome)}</b>，支出 <b style="color:var(--red)">${UI.money(todayExpense)}</b>，净额 <b style="color:var(--gold-deep)">${UI.money(todayIncome - todayExpense)}</b></li>
+            <li>日目标 ${UI.money(dailyTarget)}，${targetGap > 0 ? `还差 <b style="color:var(--red)">${UI.money(targetGap)}</b>` : '已达成 ✓'}</li>
+            <li>本月累计：收入 ${UI.money(monthIncome)} · 利润 ${UI.money(monthProfit)}</li>
             <li>待跟进客户：${d.assets.customers.length} 位在册，建议今日主动触达 2-3 位高复购客户</li>
-            <li>库存预警：${d.assets.products.filter(p=>+p.stock<=1).length} 款商品库存≤1，需及时补货</li>
           </ul>
         </div>
       </div>
@@ -137,7 +136,7 @@ const App = {
       <div class="ceo-section">
         <div class="ceo-section-label">内容建议</div>
         <div class="ceo-section-body">
-          ${topTopic ? `<p>今日推荐选题：<b>${UI.esc(topTopic.title)}</b></p><p style="color:var(--ink-500);font-size:12px">方向：${UI.esc(topTopic.direction)} · 适合平台：${UI.esc(topTopic.platform)}</p><p style="color:var(--gold-deep);font-size:12px">改编建议：${UI.esc(topTopic.suggestion)}</p>` : '<p>前往灵感中心查看今日选题</p>'}
+          ${topTopic ? `<p>今日推荐选题：<b>${UI.esc(topTopic.title)}</b></p><p style="color:var(--ink-500);font-size:12px">方向：${UI.esc(topTopic.direction)} · 适合平台：${UI.esc(topTopic.platform)}</p>` : '<p>前往灵感中心查看今日选题</p>'}
         </div>
       </div>
 
@@ -149,7 +148,7 @@ const App = {
       </div>
     `;
 
-    modal.classList.add('show');
+    document.getElementById('ceoModal').classList.add('show');
   },
 
   closeCeoModal() {
