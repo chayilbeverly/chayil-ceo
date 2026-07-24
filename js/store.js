@@ -1,7 +1,6 @@
 /* ============================================
-   Chayil CEO OS — Data Store v3
-   基于 localStorage 的数据持久化层
-   新增：优先级、Top3、打卡、目标收入、内容流程
+   Chayil CEO OS — Data Store v3.1
+   基于 localStorage 的数据持久化层 + GitHub 云端同步
    ============================================ */
 
 const Store = (function () {
@@ -20,6 +19,7 @@ const Store = (function () {
   function seed() {
     const today = todayStr();
     return {
+      _syncVersion: Date.now(),
       meta: {
         created: today,
         streak: 0,
@@ -80,14 +80,14 @@ const Store = (function () {
 
   let data = null;
 
-  function load() {
+  function loadLocal() {
     try {
       const raw = localStorage.getItem(KEY);
       if (raw) {
         data = JSON.parse(raw);
       } else {
         data = seed();
-        save();
+        saveLocal();
       }
     } catch (e) {
       data = seed();
@@ -95,17 +95,81 @@ const Store = (function () {
     return data;
   }
 
-  function save() {
+  function saveLocal() {
+    data._syncVersion = Date.now();
     localStorage.setItem(KEY, JSON.stringify(data));
   }
 
+  // === 云端同步 ===
+
+  async function load() {
+    loadLocal();
+
+    // 尝试从云端拉取
+    if (typeof Sync !== 'undefined' && Sync.hasToken()) {
+      try {
+        const remote = await Sync.pull();
+        if (remote && remote._syncVersion) {
+          // 比较版本：云端更新就用云端的
+          const localVer = data._syncVersion || 0;
+          const remoteVer = remote._syncVersion || 0;
+          if (remoteVer > localVer) {
+            data = remote;
+            saveLocal();
+            console.log('📥 已从云端同步数据 (v' + remoteVer + ' > v' + localVer + ')');
+          } else if (localVer > remoteVer) {
+            // 本地更新，推送上去
+            Sync.debouncePush(data);
+            console.log('📤 云端数据较旧，推送本地版本');
+          }
+        } else if (remote === null && data._syncVersion) {
+          // 云端没有数据，推送本地
+          Sync.debouncePush(data);
+        }
+      } catch (e) {
+        console.warn('云端同步跳过:', e.message);
+      }
+    }
+
+    return data;
+  }
+
+  function save() {
+    saveLocal();
+    // 防抖推送到云端
+    if (typeof Sync !== 'undefined' && Sync.hasToken()) {
+      Sync.debouncePush(data);
+    }
+  }
+
+  // 手动触发立即同步
+  async function syncNow() {
+    if (typeof Sync === 'undefined' || !Sync.hasToken()) return;
+    // 先拉再推
+    try {
+      const remote = await Sync.pull();
+      if (remote && remote._syncVersion) {
+        const localVer = data._syncVersion || 0;
+        const remoteVer = remote._syncVersion || 0;
+        if (remoteVer > localVer) {
+          data = remote;
+          saveLocal();
+        }
+      }
+      await Sync.pushNow(data);
+      console.log('✅ 手动同步完成');
+    } catch (e) {
+      console.warn('手动同步失败:', e.message);
+    }
+  }
+
   function get() {
-    if (!data) load();
+    if (!data) loadLocal();
     return data;
   }
 
   function update(fn) {
-    if (!data) load();
+    if (!data) loadLocal();
     fn(data);
     save();
   }
@@ -133,8 +197,8 @@ const Store = (function () {
   }
 
   return {
-    load, get, update, save, uid, todayStr,
-    addItem, removeItem, updateItem,
+    load, get, update, save, saveLocal, syncNow,
+    uid, todayStr, addItem, removeItem, updateItem,
     seed, KEY
   };
 })();
