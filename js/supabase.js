@@ -7,7 +7,7 @@
 const Supa = (function () {
   // ========== 配置 ==========
   const SUPABASE_URL = 'https://sbujvbzqrnqfrtfeggk.supabase.co';
-  const SUPABASE_ANON_KEY = 'YOUR_PUBLISHABLE_KEY'; // ← 替换为 Settings > API > anon public key
+  const SUPABASE_ANON_KEY = 'sb_publishable_JH0Ld3SybhVSjwuzKkACOA_WhVp7H77';
 
   let client = null;
   let currentUser = null;
