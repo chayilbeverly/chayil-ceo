@@ -147,10 +147,16 @@ const Store = (function () {
       const remoteData = await Supa.pullAllData(data);
       if (!remoteData) return false;
 
+      // 记录合并前的版本号，用于判断是否有真实变更
+      const oldVersion = data._syncVersion || 0;
+
       // 深度合并（保留本地最新修改）
       data = deepMerge(data, remoteData);
       saveLocal();
-      return true;
+
+      // 只有版本号真正变大时才认为有云端更新
+      const newVersion = data._syncVersion || 0;
+      return newVersion > oldVersion;
     } catch (e) {
       console.warn('云端拉取失败:', e.message);
       return false;

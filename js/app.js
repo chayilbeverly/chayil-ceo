@@ -73,27 +73,29 @@ const App = {
     this.renderSyncStatus();
     this.route(this.current);
 
-    // === 启动 Supabase 轮询（每 5 秒） ===
+    // === 启动 Supabase 轮询（每 30 秒，静默更新，不弹 toast） ===
     Supa.startPolling(async () => {
-      const changed = await Store.pullFromCloud();
-      if (changed) {
-        this.renderSyncStatus();
-        this.renderStreak();
-        this.route(this.current);
-        UI.toast('云端数据已同步');
-      }
+      try {
+        const changed = await Store.pullFromCloud();
+        if (changed) {
+          this.renderSyncStatus();
+          this.renderStreak();
+          this.route(this.current);
+        }
+      } catch (e) { /* 静默 */ }
     });
 
-    // === 页面可见时立即拉取 ===
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') {
-        this.onPageVisible();
-      }
-    });
-
-    window.addEventListener('focus', () => {
+    // === 页面恢复可见时拉取（带 10 秒冷却，避免频繁请求） ===
+    let lastVisibilityPull = 0;
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== 'visible') return;
+      const now = Date.now();
+      if (now - lastVisibilityPull < 10000) return;
+      lastVisibilityPull = now;
       this.onPageVisible();
-    });
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    window.addEventListener('focus', onVisibilityChange);
 
     // === CEO 日报按钮 ===
     document.getElementById('ceoReportBtn').addEventListener('click', () => this.openCeoModal());
