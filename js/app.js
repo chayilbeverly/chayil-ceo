@@ -23,6 +23,18 @@ const App = {
 
     await Store.load();
 
+    // 确保 streakHistory 存在并重新计算连续天数
+    Store.update(data => {
+      Store.ensureStreakHistory();
+      const history = data.meta.streakHistory || {};
+      const keys = ['fitness', 'english', 'learning', 'spiritual'];
+      if (!data.meta.personalStreaks) data.meta.personalStreaks = {};
+      keys.forEach(k => {
+        if (!history[k]) history[k] = [];
+        data.meta.personalStreaks[k] = Store.calcStreak(history[k]);
+      });
+    });
+
     // 预填充灵感与爆款数据
     Store.update(data => {
       if ((!data.inspirations || !data.inspirations.length) && typeof INSPIRATION_SEED !== 'undefined') {
