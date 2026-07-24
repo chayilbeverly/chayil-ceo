@@ -214,6 +214,47 @@ const Store = (function () {
     }
   }
 
+  // ========== 去重 ==========
+
+  function deduplicateArray(arr, key) {
+    if (!arr || !arr.length) return arr;
+    const seen = new Map();
+    const result = [];
+    for (const item of arr) {
+      const k = item[key];
+      if (k === undefined || k === null || k === '') { result.push(item); continue; }
+      if (seen.has(k)) {
+        // 保留 _updated 更大的
+        const existing = seen.get(k);
+        if ((item._updated || 0) > (existing._updated || 0)) {
+          seen.set(k, item);
+        }
+      } else {
+        seen.set(k, item);
+      }
+    }
+    return Array.from(seen.values());
+  }
+
+  function deduplicateAll(d) {
+    if (!d) return d;
+    let removed = 0;
+    if (d.tasks) {
+      ['personalGrowth', 'business', 'contentGrowth'].forEach(sub => {
+        const before = (d.tasks[sub] || []).length;
+        d.tasks[sub] = deduplicateArray(d.tasks[sub], 'text');
+        removed += before - d.tasks[sub].length;
+      });
+    }
+    if (d.assets && d.assets.customers) {
+      const before = d.assets.customers.length;
+      d.assets.customers = deduplicateArray(d.assets.customers, 'name');
+      removed += before - d.assets.customers.length;
+    }
+    if (removed > 0) console.log('[去重] 移除了', removed, '条重复数据');
+    return d;
+  }
+
   // ========== 深度合并 ==========
 
   function deepMerge(local, remote) {
@@ -362,6 +403,16 @@ const Store = (function () {
     if (!data.radar) data.radar = [];
     if (!data.reviews) data.reviews = [];
 
+    // 去重（清理同步过程中产生的重复条目）
+    const fpBefore = dataFingerprint(data);
+    deduplicateAll(data);
+    const fpAfter = dataFingerprint(data);
+    if (fpAfter !== fpBefore) {
+      saveLocal();
+      // 异步推送清理后的数据到云端
+      setTimeout(() => scheduleCloudSave(), 500);
+    }
+
     return data;
   }
 
@@ -462,5 +513,6 @@ const Store = (function () {
     seed, KEY,
     hasLegacyData, getLegacyData,
     deepMerge, mergeArrayById,
+    deduplicateAll,
   };
 })();
