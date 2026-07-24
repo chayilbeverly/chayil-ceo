@@ -326,9 +326,14 @@
         window.location.href = 'index.html';
       }
     } catch (e) {
-      var msg = e.message || '登录失败';
-      if (msg.indexOf('Invalid login') > -1) msg = '邮箱或密码错误';
-      if (msg.indexOf('Email not confirmed') > -1) msg = '邮箱尚未验证，请检查收件箱';
+      var msg = e.message || String(e) || '登录失败';
+      if (msg.indexOf('Failed to fetch') > -1 || msg.indexOf('NetworkError') > -1) {
+        msg = '网络连接失败，请确认 Supabase 项目状态正常后刷新重试';
+      } else if (msg.indexOf('Invalid login') > -1) {
+        msg = '邮箱或密码错误';
+      } else if (msg.indexOf('Email not confirmed') > -1) {
+        msg = '邮箱尚未验证，请检查收件箱';
+      }
       showError(msg);
     } finally {
       setLoading('btnLogin', false);
@@ -351,20 +356,21 @@
     try {
       var result = await Supa.signUp(email, password);
       if (result.user) {
-        // 检查是否需要邮箱验证
         if (result.session) {
-          // 无需验证，直接跳转
           window.location.href = 'index.html';
         } else {
           showError('注册成功！请检查邮箱完成验证后再登录。');
-          // 切换到登录 Tab
           document.getElementById('tabLogin').click();
         }
       }
     } catch (e) {
-      var msg = e.message || '注册失败';
-      if (msg.indexOf('already registered') > -1 || msg.indexOf('already exists') > -1) {
+      var msg = e.message || String(e) || '注册失败';
+      if (msg.indexOf('Failed to fetch') > -1 || msg.indexOf('NetworkError') > -1) {
+        msg = '网络连接失败，请确认 Supabase 项目状态正常后刷新重试';
+      } else if (msg.indexOf('already registered') > -1 || msg.indexOf('already exists') > -1) {
         msg = '该邮箱已注册，请直接登录';
+      } else if (msg.indexOf('signups not allowed') > -1 || msg.indexOf('disabled') > -1) {
+        msg = '注册功能已关闭，请联系管理员';
       }
       showError(msg);
     } finally {
@@ -378,33 +384,38 @@
     var text = document.getElementById('connText');
     dot.className = 'conn-dot checking';
     var url = Supa._getUrl ? Supa._getUrl() : '(无法获取URL)';
-    text.textContent = '正在检测连接... ' + url;
+    text.textContent = '正在检测连接...';
 
-    try {
-      var sb = Supa.getClient();
-      if (!sb) {
-        dot.className = 'conn-dot failed';
-        text.textContent = '配置错误：Publishable Key 未设置';
-        return;
-      }
-      var resp = await fetch(url + '/auth/v1/settings', {
-        method: 'GET',
-        headers: { 'apikey': (Supa._getKey ? Supa._getKey() : '') }
-      });
-      if (resp.ok) {
-        dot.className = 'conn-dot success';
-        text.textContent = 'Supabase 已连接 ✓';
-      } else {
-        dot.className = 'conn-dot failed';
-        text.textContent = '连接失败 HTTP ' + resp.status + '，请检查密钥是否正确';
-      }
-    } catch (e) {
+    // 第1步：检查 SDK 和配置
+    var sb = Supa.getClient();
+    if (!sb) {
       dot.className = 'conn-dot failed';
-      var msg = e.message || '';
+      text.textContent = 'Supabase SDK 未加载或密钥未配置';
+      console.error('[连接检测] getClient 返回 null');
+      return;
+    }
+
+    // 第2步：用 Supabase 客户端做轻量连通测试（getSession 是开销最小的请求）
+    var start = Date.now();
+    try {
+      var { data, error } = await sb.auth.getSession();
+      var elapsed = Date.now() - start;
+      // getSession 成功说明网络 + 密钥都正确（即使没有 session 也返回 data.session = null）
+      dot.className = 'conn-dot success';
+      text.textContent = 'Supabase 已连接 ✓（' + elapsed + 'ms）';
+    } catch (e) {
+      var msg = (e && e.message) || String(e);
+      dot.className = 'conn-dot failed';
       if (msg.indexOf('Failed to fetch') > -1 || msg.indexOf('NetworkError') > -1) {
-        text.textContent = '无法访问 ' + url + '。可能原因：URL 拼写错误、项目未创建、或网络问题';
+        text.textContent = '网络不通：无法访问 ' + url;
+        console.error('[连接检测] fetch 失败:', msg);
+      } else if (msg.indexOf('503') > -1 || msg.indexOf('Service') > -1) {
+        text.textContent = 'Supabase 服务暂不可用（HTTP 503），请稍后刷新';
+      } else if (msg.indexOf('401') > -1 || msg.indexOf('Invalid') > -1) {
+        text.textContent = '密钥无效（HTTP 401），请检查 Publishable Key';
       } else {
-        text.textContent = '连接异常：' + msg;
+        text.textContent = '连接异常：' + msg.slice(0, 60);
+        console.error('[连接检测]', msg);
       }
     }
   }
