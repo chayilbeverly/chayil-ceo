@@ -890,3 +890,153 @@ ul { list-style: none; }
   .form-grid, .form-grid.two, .stat-grid, .fin-summary { grid-template-columns: 1fr; }
   .radar-top { flex-direction: column; }
 }
+
+/* ============================================
+   英语学习
+   ============================================ */
+.eng-lesson-header {
+  background: linear-gradient(135deg, #1C1C1E, #2A2A2E);
+  border-radius: var(--r-lg);
+  padding: 28px 32px;
+  margin-bottom: 24px;
+  color: #F5F2EA;
+}
+.eng-lesson-badge {
+  display: inline-block;
+  padding: 4px 14px;
+  background: var(--gold-deep);
+  color: #fff;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  margin-bottom: 14px;
+}
+.eng-lesson-scene {
+  font-family: var(--ff-serif);
+  font-size: 28px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.eng-lesson-sub {
+  font-size: 13px;
+  color: var(--ink-300);
+  opacity: 0.8;
+}
+
+.eng-sentence-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 28px;
+}
+.eng-card {
+  background: var(--bg-card);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-lg);
+  padding: 20px 24px;
+  transition: all 0.25s ease;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+.eng-card:hover { box-shadow: var(--shadow-md); border-color: var(--line); }
+.eng-card.done {
+  background: var(--bg-soft);
+  border-color: var(--line-soft);
+  opacity: 0.7;
+}
+.eng-card.speaking {
+  border-color: var(--gold);
+  border-width: 2px;
+  box-shadow: var(--shadow-gold);
+}
+.eng-card-main { flex: 1; min-width: 0; }
+.eng-en {
+  font-family: var(--ff-serif);
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--ink-900);
+  margin-bottom: 6px;
+  line-height: 1.4;
+}
+.eng-card.done .eng-en { text-decoration: line-through; }
+.eng-zh {
+  font-size: 13px;
+  color: var(--ink-500);
+  margin-bottom: 4px;
+}
+.eng-tip {
+  font-size: 11px;
+  color: var(--ink-300);
+}
+.eng-card-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.eng-speak-btn, .eng-done-btn { white-space: nowrap; }
+
+.eng-progress-wrap {
+  background: var(--bg-card);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-md);
+  padding: 18px 22px;
+  margin-bottom: 28px;
+}
+.eng-progress-label {
+  font-size: 12px;
+  letter-spacing: 0.5px;
+  color: var(--ink-500);
+  margin-bottom: 10px;
+}
+.eng-progress-bar {
+  height: 8px;
+  background: var(--bg-soft);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.eng-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--gold-soft), var(--gold-deep));
+  border-radius: 4px;
+  transition: width 0.4s ease;
+}
+
+.eng-tips-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
+  margin-bottom: 24px;
+}
+.eng-tip-card {
+  background: var(--bg-card);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-md);
+  padding: 16px 18px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--ink-700);
+  line-height: 1.5;
+}
+.eng-tip-num {
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  background: var(--ink-900);
+  color: var(--gold-soft);
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+@media (max-width: 860px) {
+  .eng-card { flex-direction: column; align-items: stretch; }
+  .eng-card-actions { flex-direction: row; }
+  .eng-en { font-size: 18px; }
+}

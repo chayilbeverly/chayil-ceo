@@ -12,6 +12,7 @@ const App = {
     'radar': { title: '爆款雷达', module: 'radar' },
     'review': { title: '内容复盘', module: 'review' },
     'finance': { title: '财务管理', module: 'finance' },
+    'english': { title: '英语学习', module: 'english' },
     'assets': { title: '我的资产库', module: 'assets' },
   },
 
