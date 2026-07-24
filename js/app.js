@@ -85,12 +85,12 @@ const App = {
       } catch (e) { /* 静默 */ }
     });
 
-    // === 页面恢复可见时拉取（带 10 秒冷却，避免频繁请求） ===
+    // === 页面恢复可见时拉取（带 5 秒冷却，避免频繁请求） ===
     let lastVisibilityPull = 0;
     const onVisibilityChange = () => {
       if (document.visibilityState !== 'visible') return;
       const now = Date.now();
-      if (now - lastVisibilityPull < 10000) return;
+      if (now - lastVisibilityPull < 5000) return;
       lastVisibilityPull = now;
       this.onPageVisible();
     };

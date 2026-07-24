@@ -579,7 +579,7 @@ const Supa = (function () {
   // ========== 轮询管理 ==========
 
   let pollTimer = null;
-  let pollInterval = 30000;
+  let pollInterval = 15000;
   let onRemoteUpdate = null;
 
   function startPolling(callback) {
