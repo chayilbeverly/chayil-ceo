@@ -503,7 +503,6 @@ const Supa = (function () {
 
       // 组装完整数据
       const result = {
-        _syncVersion: Date.now(),
         meta: (meta && meta.meta) || baseData.meta || { streakHistory: { fitness: [], english: [], learning: [], spiritual: [] } },
         tasks: tasksGrouped,
         inspirations: (meta && meta.inspirations) || baseData.inspirations || [],

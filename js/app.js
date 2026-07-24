@@ -39,8 +39,9 @@ const App = {
     // === 加载数据（本地 + 云端） ===
     await Store.load();
 
-    // === 重新计算 streak ===
+    // === 一次性初始化数据（合并 3 次 update 为 1 次，减少冗余推送） ===
     Store.update(data => {
+      // 重新计算 streak
       Store.ensureStreakHistory();
       const history = data.meta.streakHistory || {};
       const keys = ['fitness', 'english', 'learning', 'spiritual'];
@@ -49,10 +50,8 @@ const App = {
         if (!history[k]) history[k] = [];
         data.meta.personalStreaks[k] = Store.calcStreak(history[k]);
       });
-    });
 
-    // === 预填充灵感与爆款数据 ===
-    Store.update(data => {
+      // 预填充灵感与爆款数据
       if ((!data.inspirations || !data.inspirations.length) && typeof INSPIRATION_SEED !== 'undefined') {
         data.inspirations = INSPIRATION_SEED.map(s => ({
           id: Store.uid(), ...s, _updated: Date.now(), date: Store.todayStr(),
@@ -73,14 +72,13 @@ const App = {
     this.renderSyncStatus();
     this.route(this.current);
 
-    // === 启动 Supabase 轮询（每 30 秒，静默更新，不弹 toast） ===
+    // === 启动 Supabase 轮询（每 15 秒静默拉取，只更新状态指示器） ===
     Supa.startPolling(async () => {
       try {
         const changed = await Store.pullFromCloud();
         if (changed) {
           this.renderSyncStatus();
           this.renderStreak();
-          this.route(this.current);
         }
       } catch (e) { /* 静默 */ }
     });
@@ -357,8 +355,6 @@ const App = {
         if (!history[k]) history[k] = [];
         data.meta.personalStreaks[k] = Store.calcStreak(history[k]);
       });
-    });
-    Store.update(data => {
       if ((!data.inspirations || !data.inspirations.length) && typeof INSPIRATION_SEED !== 'undefined') {
         data.inspirations = INSPIRATION_SEED.map(s => ({ id: Store.uid(), ...s, _updated: Date.now(), date: Store.todayStr(), category: s.category || '创业', status: 'pending' }));
       }

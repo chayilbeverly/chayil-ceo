@@ -3,7 +3,7 @@
    缓存策略：Network First（优先网络，离线回退缓存）
    ============================================ */
 
-const CACHE_NAME = 'chayil-ceo-v3';
+const CACHE_NAME = 'chayil-ceo-v4';
 const STATIC_ASSETS = [
   '/chayil-ceo/',
   '/chayil-ceo/index.html',

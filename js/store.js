@@ -83,7 +83,7 @@ const Store = (function () {
   let data = null;
   let cloudUpdatedAt = null;
   let saveDebounceTimer = null;
-  let isSaving = false;
+  let _cloudBusy = false;  // 同步锁：防止并发 push/pull
 
   // ========== 本地存储 ==========
 
@@ -104,8 +104,8 @@ const Store = (function () {
   function scheduleCloudSave() {
     clearTimeout(saveDebounceTimer);
     saveDebounceTimer = setTimeout(async () => {
-      if (isSaving || !Supa.getUserId()) return;
-      isSaving = true;
+      if (_cloudBusy || !Supa.getUserId()) return;
+      _cloudBusy = true;
       try {
         data._syncVersion = Date.now();
         const ok = await Supa.pushAllData(data);
@@ -116,7 +116,7 @@ const Store = (function () {
       } catch (e) {
         console.warn('云端保存失败:', e.message);
       } finally {
-        isSaving = false;
+        _cloudBusy = false;
       }
     }, 2000);
   }
@@ -124,7 +124,8 @@ const Store = (function () {
   async function pushNow() {
     clearTimeout(saveDebounceTimer);
     if (!Supa.getUserId()) return false;
-    isSaving = true;
+    if (_cloudBusy) return false;
+    _cloudBusy = true;
     try {
       data._syncVersion = Date.now();
       const ok = await Supa.pushAllData(data);
@@ -137,29 +138,66 @@ const Store = (function () {
       console.warn('云端推送失败:', e.message);
       return false;
     } finally {
-      isSaving = false;
+      _cloudBusy = false;
     }
+  }
+
+  // 计算数据内容指纹（所有条目的 id + _updated 时间戳）
+  function dataFingerprint(d) {
+    const parts = [];
+    function collect(arr) {
+      if (!arr || !arr.length) return;
+      for (let i = 0; i < arr.length; i++) {
+        const item = arr[i];
+        if (item && item.id) parts.push(item.id + ':' + (item._updated || 0));
+      }
+    }
+    if (d.tasks) {
+      collect(d.tasks.personalGrowth);
+      collect(d.tasks.business);
+      collect(d.tasks.contentGrowth);
+      collect(d.tasks.topThree);
+    }
+    if (d.assets) {
+      collect(d.assets.customers);
+      collect(d.assets.products);
+      collect(d.assets.deals);
+      collect(d.assets.contentAssets);
+    }
+    if (d.finance) {
+      collect(d.finance.income);
+      collect(d.finance.expense);
+    }
+    collect(d.inspirations);
+    collect(d.radar);
+    collect(d.reviews);
+    return parts.sort().join('|');
   }
 
   async function pullFromCloud() {
     if (!Supa.getUserId()) return false;
+    if (_cloudBusy) return false;
+    _cloudBusy = true;
     try {
       const remoteData = await Supa.pullAllData(data);
       if (!remoteData) return false;
 
-      // 记录合并前的版本号，用于判断是否有真实变更
-      const oldVersion = data._syncVersion || 0;
-
-      // 深度合并（保留本地最新修改）
+      // 指纹对比：合并前后是否真的有数据变化
+      const fpBefore = dataFingerprint(data);
       data = deepMerge(data, remoteData);
       saveLocal();
+      const fpAfter = dataFingerprint(data);
 
-      // 只有版本号真正变大时才认为有云端更新
-      const newVersion = data._syncVersion || 0;
-      return newVersion > oldVersion;
+      if (fpAfter !== fpBefore) {
+        cloudUpdatedAt = new Date().toISOString();
+        return true;
+      }
+      return false;
     } catch (e) {
       console.warn('云端拉取失败:', e.message);
       return false;
+    } finally {
+      _cloudBusy = false;
     }
   }
 
