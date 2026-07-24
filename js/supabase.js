@@ -34,6 +34,8 @@ const Supa = (function () {
 
   function getClient() { return initClient(); }
   function isConfigured() { return SUPABASE_ANON_KEY !== 'YOUR_PUBLISHABLE_KEY'; }
+  function _getUrl() { return SUPABASE_URL; }
+  function _getKey() { return SUPABASE_ANON_KEY; }
 
   // ========== 认证 ==========
 
@@ -571,7 +573,7 @@ const Supa = (function () {
   }
 
   return {
-    initClient, getClient, isConfigured,
+    initClient, getClient, isConfigured, _getUrl, _getKey,
     signUp, signIn, signOut, getSession, getUser, getUserId,
     // 分离表 CRUD
     loadTasks, saveTasks, deleteTask,

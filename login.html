@@ -82,6 +82,28 @@
     padding: 32px 28px;
     text-align: left;
   }
+  /* 连接状态 */
+  .conn-status {
+    background: var(--bg-card);
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    padding: 12px 16px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12px;
+    color: var(--ink-500);
+  }
+  .conn-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .conn-dot.checking { background: var(--gold-soft); animation: spin 0.6s linear infinite; }
+  .conn-dot.success { background: #4CAF50; box-shadow: 0 0 6px rgba(76,175,80,0.5); }
+  .conn-dot.failed { background: #B85450; box-shadow: 0 0 6px rgba(184,84,80,0.4); }
+  .conn-text { line-height: 1.4; word-break: break-all; }
   .login-tabs {
     display: flex;
     gap: 0;
@@ -190,6 +212,12 @@
     <div class="login-mark">C</div>
     <div class="login-name">Chayil CEO</div>
     <div class="login-sub">Personal Operating System</div>
+  </div>
+
+  <!-- 连接状态检测 -->
+  <div class="conn-status" id="connStatus">
+    <span class="conn-dot" id="connDot"></span>
+    <span class="conn-text" id="connText">正在检测 Supabase 连接...</span>
   </div>
 
   <div class="login-card">
@@ -344,6 +372,46 @@
     }
   }
 
+  // ===== Supabase 连接检测 =====
+  async function checkConnection() {
+    var dot = document.getElementById('connDot');
+    var text = document.getElementById('connText');
+    dot.className = 'conn-dot checking';
+    var url = Supa._getUrl ? Supa._getUrl() : '(无法获取URL)';
+    text.textContent = '正在检测连接... ' + url;
+
+    try {
+      var sb = Supa.getClient();
+      if (!sb) {
+        dot.className = 'conn-dot failed';
+        text.textContent = '配置错误：Publishable Key 未设置';
+        return;
+      }
+      var resp = await fetch(url + '/auth/v1/settings', {
+        method: 'GET',
+        headers: { 'apikey': (Supa._getKey ? Supa._getKey() : '') }
+      });
+      if (resp.ok) {
+        dot.className = 'conn-dot success';
+        text.textContent = 'Supabase 已连接 ✓';
+      } else {
+        dot.className = 'conn-dot failed';
+        text.textContent = '连接失败 HTTP ' + resp.status + '，请检查密钥是否正确';
+      }
+    } catch (e) {
+      dot.className = 'conn-dot failed';
+      var msg = e.message || '';
+      if (msg.indexOf('Failed to fetch') > -1 || msg.indexOf('NetworkError') > -1) {
+        text.textContent = '无法访问 ' + url + '。可能原因：URL 拼写错误、项目未创建、或网络问题';
+      } else {
+        text.textContent = '连接异常：' + msg;
+      }
+    }
+  }
+
+  // 先检测连接
+  checkConnection();
+
   // 如果已登录，直接跳转
   (async function () {
     try {
@@ -351,7 +419,7 @@
       if (session) {
         window.location.href = 'index.html';
       }
-    } catch (e) { /* 未登录，留在登录页 */ }
+    } catch (e) { /* 未登录 */ }
   })();
 </script>
 </body>
