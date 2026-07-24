@@ -135,14 +135,18 @@ const Supa = (function () {
     const sb = getClient();
     const uid = getUserId();
     if (!sb || !uid || !tasks) return false;
+    if (!tasks.length) { console.log('[saveTasks] 任务列表为空，跳过'); return true; }
     const rows = tasks.map(taskToRow);
+    console.log('[saveTasks] 准备 upsert', rows.length, '条任务, user_id:', uid);
     // 分批 UPSERT（每批最多 50 条）
+    let allOk = true;
     for (let i = 0; i < rows.length; i += 50) {
       const batch = rows.slice(i, i + 50);
-      const { error } = await sb.from('tasks').upsert(batch, { onConflict: 'local_id' });
-      if (error) { console.warn('保存 tasks 失败:', error.message); return false; }
+      const { error } = await sb.from('tasks').upsert(batch, { onConflict: 'user_id,local_id' });
+      if (error) { console.error('[saveTasks] upsert 失败:', error); allOk = false; }
     }
-    return true;
+    console.log('[saveTasks] 完成, 共', rows.length, '条, 状态:', allOk ? 'OK' : 'FAILED');
+    return allOk;
   }
 
   async function deleteTask(localId) {
@@ -211,15 +215,18 @@ const Supa = (function () {
     const uid = getUserId();
     if (!sb || !uid || !customers) return false;
     const rows = customers.map(customerToRow);
+    console.log('[saveCustomers] 准备 upsert', rows.length, '条客户, user_id:', uid);
+    let allOk = true;
     for (let i = 0; i < rows.length; i += 50) {
       const batch = rows.slice(i, i + 50);
-      const { error } = await sb.from('customers').upsert(batch, { onConflict: 'local_id' });
-      if (error) { console.warn('保存 customers 失败:', error.message); return false; }
+      const { error } = await sb.from('customers').upsert(batch, { onConflict: 'user_id,local_id' });
+      if (error) { console.error('[saveCustomers] upsert 失败:', error); allOk = false; }
     }
     // 清理已删除的
     const localIds = customers.map(c => c.id);
     await deleteFromTable('customers', localIds);
-    return true;
+    console.log('[saveCustomers] 完成, 共', rows.length, '条, 状态:', allOk ? 'OK' : 'FAILED');
+    return allOk;
   }
 
   function customerToRow(c) {
@@ -280,14 +287,18 @@ const Supa = (function () {
     const rows = [];
     (financeData.income || []).forEach(f => rows.push(financeToRow(f, 'income')));
     (financeData.expense || []).forEach(f => rows.push(financeToRow(f, 'expense')));
+    console.log('[saveFinance] 准备 upsert', rows.length, '条财务记录, user_id:', uid);
+    if (!rows.length) { console.log('[saveFinance] 无数据，跳过'); return true; }
+    let allOk = true;
     for (let i = 0; i < rows.length; i += 50) {
       const batch = rows.slice(i, i + 50);
-      const { error } = await sb.from('finance').upsert(batch, { onConflict: 'local_id' });
-      if (error) { console.warn('保存 finance 失败:', error.message); return false; }
+      const { error } = await sb.from('finance').upsert(batch, { onConflict: 'user_id,local_id' });
+      if (error) { console.error('[saveFinance] upsert 失败:', error); allOk = false; }
     }
     const allIds = rows.map(r => r.local_id);
     await deleteFromTable('finance', allIds);
-    return true;
+    console.log('[saveFinance] 完成, 共', rows.length, '条, 状态:', allOk ? 'OK' : 'FAILED');
+    return allOk;
   }
 
   function financeToRow(f, type) {
@@ -329,15 +340,19 @@ const Supa = (function () {
     const sb = getClient();
     const uid = getUserId();
     if (!sb || !uid || !contents) return false;
+    if (!contents.length) { console.log('[saveContents] 无内容，跳过'); return true; }
     const rows = contents.map(contentToRow);
+    console.log('[saveContents] 准备 upsert', rows.length, '条内容, user_id:', uid);
+    let allOk = true;
     for (let i = 0; i < rows.length; i += 50) {
       const batch = rows.slice(i, i + 50);
-      const { error } = await sb.from('contents').upsert(batch, { onConflict: 'local_id' });
-      if (error) { console.warn('保存 contents 失败:', error.message); return false; }
+      const { error } = await sb.from('contents').upsert(batch, { onConflict: 'user_id,local_id' });
+      if (error) { console.error('[saveContents] upsert 失败:', error); allOk = false; }
     }
     const localIds = contents.map(c => c.id);
     await deleteFromTable('contents', localIds);
-    return true;
+    console.log('[saveContents] 完成, 共', rows.length, '条, 状态:', allOk ? 'OK' : 'FAILED');
+    return allOk;
   }
 
   function contentToRow(c) {
@@ -421,7 +436,9 @@ const Supa = (function () {
    */
   async function pushAllData(appData) {
     const uid = getUserId();
-    if (!uid) return false;
+    if (!uid) { console.warn('[pushAllData] 未登录，跳过推送'); return false; }
+
+    console.group('[pushAllData] 开始推送, user_id:', uid);
 
     try {
       // 1. 任务
@@ -433,22 +450,30 @@ const Supa = (function () {
           });
         });
       }
-      await saveTasks(allTasks);
+      console.log('[pushAllData] 任务:', allTasks.length, '条');
+      const t1 = await saveTasks(allTasks);
 
       // 2. 客户
       const customers = (appData.assets && appData.assets.customers) || [];
-      await saveCustomers(customers);
+      console.log('[pushAllData] 客户:', customers.length, '条');
+      const t2 = await saveCustomers(customers);
 
       // 3. 财务
       const finance = appData.finance || { income: [], expense: [] };
-      await saveFinance(finance);
+      const fCount = (finance.income || []).length + (finance.expense || []).length;
+      console.log('[pushAllData] 财务:', fCount, '条');
+      const t3 = await saveFinance(finance);
 
       // 4. 内容复盘
       const contents = appData.reviews || [];
-      await saveContents(contents);
+      console.log('[pushAllData] 内容复盘:', contents.length, '条');
+      const t4 = await saveContents(contents);
 
       // 5. 元数据（灵感、雷达、产品、交易、打卡等）
-      const meta = {
+      const inspCount = (appData.inspirations || []).length;
+      const radarCount = (appData.radar || []).length;
+      console.log('[pushAllData] 元数据: 灵感', inspCount, '条, 雷达', radarCount, '条');
+      const t5 = await saveMeta({
         meta: appData.meta || {},
         inspirations: appData.inspirations || [],
         radar: appData.radar || [],
@@ -457,12 +482,15 @@ const Supa = (function () {
         contentAssets: (appData.assets && appData.assets.contentAssets) || [],
         dailyTarget: (appData.finance && appData.finance.dailyTarget) || 4000,
         tasksTopThree: (appData.tasks && appData.tasks.topThree) || [],
-      };
-      await saveMeta(meta);
+      });
 
-      return true;
+      const allOk = t1 && t2 && t3 && t4 && t5;
+      console.log('[pushAllData] 推送完成: tasks=', t1, 'customers=', t2, 'finance=', t3, 'contents=', t4, 'meta=', t5, '→', allOk ? 'ALL_OK' : 'PARTIAL_FAIL');
+      console.groupEnd();
+      return allOk;
     } catch (e) {
-      console.warn('批量推送失败:', e.message);
+      console.error('[pushAllData] 异常:', e);
+      console.groupEnd();
       return false;
     }
   }
@@ -472,10 +500,11 @@ const Supa = (function () {
    */
   async function pullAllData(baseData) {
     const uid = getUserId();
-    if (!uid) return null;
+    if (!uid) { console.warn('[pullAllData] 未登录，跳过拉取'); return null; }
+
+    console.group('[pullAllData] 开始拉取, user_id:', uid);
 
     try {
-      // 并行拉取所有表
       const [tasks, customers, finance, contents, meta] = await Promise.all([
         loadTasks(),
         loadCustomers(),
@@ -483,6 +512,10 @@ const Supa = (function () {
         loadContents(),
         loadMeta(),
       ]);
+
+      console.log('[pullAllData] 拉取结果: tasks=', tasks.length, 'customers=', customers.length,
+        'finance(income+expense)=', (finance.income||[]).length + (finance.expense||[]).length,
+        'contents=', contents.length, 'meta=', meta ? '有' : '无');
 
       // 组装任务
       const tasksGrouped = { topThree: [], personalGrowth: [], business: [], contentGrowth: [] };
@@ -516,9 +549,11 @@ const Supa = (function () {
         assets: assets,
       };
 
+      console.groupEnd();
       return result;
     } catch (e) {
-      console.warn('批量拉取失败:', e.message);
+      console.error('[pullAllData] 异常:', e);
+      console.groupEnd();
       return null;
     }
   }

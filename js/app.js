@@ -77,10 +77,11 @@ const App = {
       try {
         const changed = await Store.pullFromCloud();
         if (changed) {
+          console.log('[轮询] 检测到云端更新，刷新状态');
           this.renderSyncStatus();
           this.renderStreak();
         }
-      } catch (e) { /* 静默 */ }
+      } catch (e) { console.warn('[轮询] 异常:', e.message); }
     });
 
     // === 页面恢复可见时拉取（带 5 秒冷却，避免频繁请求） ===
@@ -162,11 +163,12 @@ const App = {
     try {
       const changed = await Store.pullFromCloud();
       if (changed) {
+        console.log('[页面可见] 检测到云端更新，刷新视图');
         this.renderSyncStatus();
         this.renderStreak();
         this.route(this.current);
       }
-    } catch (e) { /* 静默 */ }
+    } catch (e) { console.warn('[页面可见] 拉取异常:', e.message); }
   },
 
   // === 同步状态 ===
@@ -227,13 +229,20 @@ const App = {
     if (mnavSync) {
       mnavSync.addEventListener('click', async () => {
         UI.toast('正在同步...');
-        const ok = await Store.pushNow();
-        if (ok) {
-          this.renderSyncStatus();
-          UI.toast('同步完成 ✓');
-        } else {
-          UI.toast('同步失败，请检查网络');
+        // 先推送到云端
+        const pushed = await Store.pushNow();
+        if (!pushed) {
+          UI.toast('❌ 推送失败，请检查网络');
+          return;
         }
+        // 再从云端拉取（确保双向同步）
+        const pulled = await Store.pullFromCloud();
+        if (pulled) {
+          this.renderSyncStatus();
+          this.renderStreak();
+          this.route(this.current);
+        }
+        UI.toast('同步完成 ✓');
       });
     }
   },

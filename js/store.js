@@ -123,19 +123,24 @@ const Store = (function () {
 
   async function pushNow() {
     clearTimeout(saveDebounceTimer);
-    if (!Supa.getUserId()) return false;
-    if (_cloudBusy) return false;
+    if (!Supa.getUserId()) { console.warn('[pushNow] 未登录，跳过'); return false; }
+    if (_cloudBusy) { console.warn('[pushNow] 同步锁忙，跳过'); return false; }
     _cloudBusy = true;
     try {
       data._syncVersion = Date.now();
+      const taskCount = (data.tasks.personalGrowth||[]).length + (data.tasks.business||[]).length + (data.tasks.contentGrowth||[]).length;
+      console.log('[pushNow] 推送: tasks=', taskCount, 'customers=', (data.assets.customers||[]).length, 'inspirations=', (data.inspirations||[]).length);
       const ok = await Supa.pushAllData(data);
       if (ok) {
         cloudUpdatedAt = new Date().toISOString();
         saveLocal();
+        console.log('[pushNow] ✅ 推送成功, time:', cloudUpdatedAt);
+      } else {
+        console.error('[pushNow] ❌ 推送失败');
       }
       return ok;
     } catch (e) {
-      console.warn('云端推送失败:', e.message);
+      console.error('[pushNow] 异常:', e);
       return false;
     } finally {
       _cloudBusy = false;
@@ -175,12 +180,12 @@ const Store = (function () {
   }
 
   async function pullFromCloud() {
-    if (!Supa.getUserId()) return false;
-    if (_cloudBusy) return false;
+    if (!Supa.getUserId()) { console.warn('[pullFromCloud] 未登录，跳过'); return false; }
+    if (_cloudBusy) { console.log('[pullFromCloud] 同步锁忙，跳过'); return false; }
     _cloudBusy = true;
     try {
       const remoteData = await Supa.pullAllData(data);
-      if (!remoteData) return false;
+      if (!remoteData) { console.warn('[pullFromCloud] 拉取返回空'); return false; }
 
       // 指纹对比：合并前后是否真的有数据变化
       const fpBefore = dataFingerprint(data);
@@ -190,11 +195,13 @@ const Store = (function () {
 
       if (fpAfter !== fpBefore) {
         cloudUpdatedAt = new Date().toISOString();
+        console.log('[pullFromCloud] ✅ 有新数据 (指纹变化), time:', cloudUpdatedAt);
         return true;
       }
+      console.log('[pullFromCloud] 指纹未变，跳过');
       return false;
     } catch (e) {
-      console.warn('云端拉取失败:', e.message);
+      console.error('[pullFromCloud] 异常:', e);
       return false;
     } finally {
       _cloudBusy = false;
