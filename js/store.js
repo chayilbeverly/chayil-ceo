@@ -204,6 +204,7 @@ const Store = (function () {
     collect(d.inspirations);
     collect(d.radar);
     collect(d.reviews);
+    collect(d.dailyReviews);
     return parts.sort().join('|');
   }
 

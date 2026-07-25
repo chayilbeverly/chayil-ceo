@@ -867,11 +867,21 @@ ul { list-style: none; }
   padding: 12px 22px;
   border-radius: var(--r-sm);
   font-size: 13px;
-  z-index: 200;
+  z-index: 2000;
   box-shadow: var(--shadow-lg);
   animation: toastIn 0.3s ease;
+  pointer-events: none;
 }
 @keyframes toastIn { from { opacity: 0; transform: translate(-50%, 20px); } to { opacity: 1; transform: translate(-50%, 0); } }
+
+/* 移动端 Toast 显示在导航栏上方 */
+@media (max-width: 768px) {
+  .toast {
+    bottom: 90px;
+    font-size: 14px;
+    padding: 14px 24px;
+  }
+}
 
 /* 响应式 */
 @media (max-width: 1100px) {
@@ -890,9 +900,12 @@ ul { list-style: none; }
   .form-grid, .form-grid.two { grid-template-columns: 1fr 1fr; }
   .stat-grid, .fin-summary { grid-template-columns: repeat(2, 1fr); }
   .topbar { padding: 18px 20px 14px; }
-  .view-container { padding: 0 20px 36px; }
+  .view-container { padding: 0 20px 90px; }
+  /* 确保移动端内容不被底部导航栏+键盘遮挡 */
+  .view { padding-bottom: 12px; }
 }
 @media (max-width: 520px) {
+  .view-container { padding: 0 16px 90px; }
   .form-grid, .form-grid.two, .stat-grid, .fin-summary { grid-template-columns: 1fr; }
   .radar-top { flex-direction: column; }
 }
@@ -1797,13 +1810,13 @@ ul { list-style: none; }
   .yest-data-card .yest-data-num .unit { font-size: 12px; }
   .yest-data-card .yest-data-desc { font-size: 10px; }
   .yest-review-auto,
-  .yest-review-manual { padding: 16px; margin-bottom: 18px; }
+  .yest-review-manual { padding: 16px; margin-bottom: 24px; }
   .yest-review-label { font-size: 11px; margin-bottom: 12px; }
   .review-textarea { min-height: 100px; font-size: 16px; }
   .review-form-item { gap: 4px; }
   .review-form-label { font-size: 12px; }
   .review-form .btn { width: 100%; justify-content: center; }
-  .review-form .form-actions { justify-content: center; }
+  .review-form .form-actions { justify-content: center; padding-top: 6px; }
   .yest-history-data { grid-template-columns: repeat(2, 1fr); }
   .yest-history-header { flex-wrap: wrap; }
   .yest-history-stats { font-size: 11px; gap: 8px; }
@@ -1947,12 +1960,15 @@ ul { list-style: none; }
     min-height: 40px;
     padding: 10px 18px;
     font-size: 14px;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
   }
 
   .btn-sm {
     min-height: 36px;
     padding: 8px 14px;
     font-size: 13px;
+    touch-action: manipulation;
   }
 
   /* 模态窗口全屏 */
@@ -1964,10 +1980,18 @@ ul { list-style: none; }
     border-radius: var(--r-md);
   }
 
-  /* 输入框更大 */
+  /* 输入框更大，防止 iOS 输入缩放 + 圆角重置 */
   .form-input, .form-textarea, .form-select, .input {
-    font-size: 16px; /* 防止iOS缩放 */
+    font-size: 16px;
     padding: 10px 14px;
+    -webkit-appearance: none;
+    border-radius: 10px;
+  }
+
+  /* 表单操作区在移动端留足呼吸空间 */
+  .form-actions {
+    padding-top: 4px;
+    padding-bottom: 8px;
   }
 
   /* 表格横向滚动 */

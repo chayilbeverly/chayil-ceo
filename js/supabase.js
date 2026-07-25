@@ -485,6 +485,7 @@ const Supa = (function () {
         contentAssets: (appData.assets && appData.assets.contentAssets) || [],
         dailyTarget: (appData.finance && appData.finance.dailyTarget) || 4000,
         tasksTopThree: (appData.tasks && appData.tasks.topThree) || [],
+        dailyReviews: appData.dailyReviews || [],
       });
 
       const allOk = t1 && t2 && t3 && t4 && t5;
@@ -544,6 +545,7 @@ const Supa = (function () {
         inspirations: (meta && meta.inspirations) || baseData.inspirations || [],
         radar: (meta && meta.radar) || baseData.radar || [],
         reviews: contents,
+        dailyReviews: (meta && meta.dailyReviews) || baseData.dailyReviews || [],
         finance: {
           dailyTarget: (meta && meta.dailyTarget) || 4000,
           income: finance.income || [],
