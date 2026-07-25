@@ -162,7 +162,12 @@ window.Modules.assets = {
             <div class="form-field full">
               <label class="form-label">商品图片</label>
               <div class="image-upload-wrap">
-                <input type="file" class="form-input" id="p-image" accept="image/*" style="padding:7px 12px" onchange="Modules.assets.previewProductImage(this)">
+                <label class="image-upload-btn" for="p-image">
+                  <span class="image-upload-icon">📷</span>
+                  <span class="image-upload-text">点击上传图片</span>
+                  <span class="image-upload-hint">支持拍照/相册，小于2MB</span>
+                </label>
+                <input type="file" class="form-input image-upload-input" id="p-image" accept="image/*" capture="environment" onchange="Modules.assets.previewProductImage(this)">
                 <div class="image-preview" id="p-image-preview" style="display:none"></div>
               </div>
             </div>
@@ -340,8 +345,11 @@ window.Modules.assets = {
 
   previewProductImage(input) {
     const previewEl = document.getElementById('p-image-preview');
+    const uploadBtn = input.previousElementSibling; // label button
     if (!input.files || !input.files[0]) {
       previewEl.style.display = 'none';
+      previewEl.className = 'image-preview';
+      if (uploadBtn) uploadBtn.style.display = '';
       return;
     }
     const file = input.files[0];
@@ -349,12 +357,16 @@ window.Modules.assets = {
       UI.toast('图片太大，请选择小于 2MB 的图片');
       input.value = '';
       previewEl.style.display = 'none';
+      previewEl.className = 'image-preview';
+      if (uploadBtn) uploadBtn.style.display = '';
       return;
     }
     const reader = new FileReader();
     reader.onload = function(e) {
       previewEl.style.display = 'block';
-      previewEl.innerHTML = `<img src="${e.target.result}" style="width:120px;height:120px;object-fit:cover;border-radius:8px;border:2px solid var(--line)">`;
+      previewEl.className = 'image-preview has-image';
+      previewEl.innerHTML = `<img src="${e.target.result}" style="width:100%;max-height:240px;object-fit:contain;border-radius:8px;border:2px solid var(--line)"><button type="button" class="image-change-btn" onclick="event.preventDefault();document.getElementById('p-image').click()">✎ 更换图片</button>`;
+      if (uploadBtn) uploadBtn.style.display = 'none';
     };
     reader.readAsDataURL(file);
   },
