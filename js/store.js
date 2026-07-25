@@ -71,10 +71,10 @@ const Store = (function () {
           { id: uid(), name: '王太太', contact: '电话 138****', brand: 'Hermes', time: '2026-07-20', amount: 98000, preference: '限量款', budget: '80000-200000', frequency: '不定期', note: '高净值客户，推荐稀缺款', followUpTime: '', _updated: ts },
         ],
         products: [
-          { id: uid(), product_name: 'Neverfull MM', brand: 'Louis Vuitton', category: '托特包', quantity: 3, cost_price: 6500, sale_price: 8800, status: '库存中', image: '', _updated: ts },
-          { id: uid(), product_name: 'Classic Flap 中号', brand: 'Chanel', category: '单肩包', quantity: 1, cost_price: 38000, sale_price: 52000, status: '库存中', image: '', _updated: ts },
-          { id: uid(), product_name: 'Birkin 25', brand: 'Hermes', category: '手提包', quantity: 1, cost_price: 75000, sale_price: 98000, status: '库存中', image: '', _updated: ts },
-          { id: uid(), product_name: 'Lady Dior 中号', brand: 'Dior', category: '单肩包', quantity: 2, cost_price: 28000, sale_price: 38000, status: '库存中', image: '', _updated: ts },
+          { id: uid(), product_name: 'Neverfull MM', brand: 'Louis Vuitton', category: '托特包', quantity: 3, cost_price: 6500, sale_price: 8800, status: '库存中', acquisition_type: '客户寄售', image: '', _updated: ts },
+          { id: uid(), product_name: 'Classic Flap 中号', brand: 'Chanel', category: '单肩包', quantity: 1, cost_price: 38000, sale_price: 52000, status: '库存中', acquisition_type: '个人回收', image: '', _updated: ts },
+          { id: uid(), product_name: 'Birkin 25', brand: 'Hermes', category: '手提包', quantity: 1, cost_price: 75000, sale_price: 98000, status: '库存中', acquisition_type: '代购', image: '', _updated: ts },
+          { id: uid(), product_name: 'Lady Dior 中号', brand: 'Dior', category: '单肩包', quantity: 2, cost_price: 28000, sale_price: 38000, status: '库存中', acquisition_type: '同行调货', image: '', _updated: ts },
         ],
         deals: [
           { id: uid(), need: '通勤大容量包，预算1万内', process: '推荐 LV Neverfull，强调耐用与保值', price: 8800, reason: '客户看重实用+品牌认知，Neverfull 完美匹配', _updated: ts },
@@ -638,7 +638,7 @@ const Store = (function () {
     for (const d of sorted) {
       if (d === expected) {
         streak++;
-        const dt = new Date(d);
+        const dt = new Date(d + 'T00:00:00');
         dt.setDate(dt.getDate() - 1);
         expected = dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0');
       } else if (d < expected) break;

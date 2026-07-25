@@ -102,7 +102,7 @@ window.Modules.yesterdayReview = {
     const allTasks = [...d.tasks.personalGrowth, ...d.tasks.business, ...d.tasks.contentGrowth];
     const income = d.finance.income.filter(i => i.date === date).reduce((s, i) => s + (+i.amount || 0), 0);
     const orderCount = d.finance.income.filter(i => i.date === date).length;
-    const doneTasks = allTasks.filter(t => t.done).length;
+    const doneTasks = allTasks.filter(t => t.doneDate === date || (!t.doneDate && t.done)).length;
     const undoneTasks = allTasks.filter(t => !t.done).length;
     const newCustomers = d.assets.customers.filter(c => c.time === date).length;
     const publishedContent = (d.reviews || []).filter(r => r.date === date).length;

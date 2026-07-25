@@ -244,6 +244,12 @@ ul { list-style: none; }
   box-shadow: var(--shadow-gold);
 }
 .btn-gold:hover { filter: brightness(1.08); }
+.btn-sell {
+  background: linear-gradient(135deg, #e74c3c, #c0392b);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(231,76,60,0.25);
+}
+.btn-sell:hover { filter: brightness(1.1); }
 .btn-dark {
   background: var(--ink-900);
   color: #F5F2EA;

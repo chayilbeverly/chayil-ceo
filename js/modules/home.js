@@ -205,7 +205,8 @@ window.Modules.home = {
       if (t) { found = { group: g, task: t }; break; }
     }
     if (!found) return;
-    Store.updateItem(found.group, id, { done: !found.task.done }, 'tasks');
+    const nowDone = !found.task.done;
+    Store.updateItem(found.group, id, { done: nowDone, doneDate: nowDone ? Store.todayStr() : null }, 'tasks');
     // refresh
     const container = document.getElementById('viewContainer');
     this.render(container);

@@ -187,7 +187,8 @@ window.Modules.dailyPlan = {
     const d = Store.get();
     const t = d.tasks[group].find(x => x.id === id);
     if (!t) return;
-    Store.updateItem(group, id, { done: !t.done }, 'tasks');
+    const nowDone = !t.done;
+    Store.updateItem(group, id, { done: nowDone, doneDate: nowDone ? Store.todayStr() : null }, 'tasks');
     this.renderList(group);
     this.refreshStats();
     this.refreshMeta(group);

@@ -131,6 +131,8 @@ window.Modules.assets = {
       sale_price: p.sale_price !== undefined ? p.sale_price : (p.price || 0),
       status: p.status || '库存中',
       image: p.image || '',
+      acquisition_type: p.acquisition_type || '',
+      acquisition_notes: p.acquisition_notes || '',
       _updated: p._updated || 0,
     };
   },
@@ -156,6 +158,7 @@ window.Modules.assets = {
             <div class="form-field"><label class="form-label">成本价 ¥</label><input type="number" class="form-input" id="p-cost" placeholder="0" step="0.01"></div>
             <div class="form-field"><label class="form-label">售价 ¥</label><input type="number" class="form-input" id="p-price" placeholder="0" step="0.01"></div>
             <div class="form-field"><label class="form-label">状态</label><select class="form-select" id="p-status"><option>库存中</option><option>已售出</option><option>预留</option></select></div>
+            <div class="form-field"><label class="form-label">来源</label><select class="form-select" id="p-source"><option value="">— 选填 —</option><option>个人回收</option><option>客户寄售</option><option>同行调货</option><option>代购</option><option>自有闲置</option></select></div>
             <div class="form-field full">
               <label class="form-label">商品图片</label>
               <div class="image-upload-wrap">
@@ -171,7 +174,7 @@ window.Modules.assets = {
       <div class="fin-summary" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px">
         <div class="fin-card"><div class="fin-label">库存总值</div><div class="fin-value income">${UI.money(totalValue)}</div></div>
         <div class="fin-card"><div class="fin-label">库存成本</div><div class="fin-value expense">${UI.money(totalCost)}</div></div>
-        <div class="fin-card"><div class="fin-label">预估总利润</div><div class="fin-value profit">${UI.money(totalProfit)}</div></div>
+        <div class="fin-card"><div class="fin-label">预估总利润</div><div class="fin-value profit">${UI.money(totalProfit)}<span style="font-size:11px;color:var(--ink-300);margin-left:4px">${totalCost > 0 ? Math.round(totalProfit / totalCost * 100) : 0}%</span></div></div>
         <div class="fin-card"><div class="fin-label">在库商品</div><div class="fin-value" style="font-family:var(--ff-sans);font-size:26px">${list.length} 款</div></div>
       </div>
 
@@ -224,7 +227,7 @@ window.Modules.assets = {
       </div>
       <div class="pcv2-info">
         <div class="pcv2-name">${UI.esc(p.product_name)}</div>
-        <div class="pcv2-brand">${UI.esc(p.brand)}${p.category ? ' · ' + UI.esc(p.category) : ''}</div>
+        <div class="pcv2-brand">${UI.esc(p.brand)}${p.category ? ' · ' + UI.esc(p.category) : ''}${p.acquisition_type ? ' · <span style="color:var(--ink-400)">' + UI.esc(p.acquisition_type) + '</span>' : ''}</div>
         <div class="pcv2-stats">
           <div class="pcv2-stat">
             <span class="pcv2-stat-label">数量</span>
@@ -277,12 +280,14 @@ window.Modules.assets = {
             <div class="pd-info-item"><span class="pd-label">分类</span><span class="pd-value">${UI.esc(p.category || '—')}</span></div>
             <div class="pd-info-item"><span class="pd-label">数量</span><span class="pd-value">${p.quantity}</span></div>
             <div class="pd-info-item"><span class="pd-label">状态</span><span class="pd-value">${UI.esc(p.status)}</span></div>
+            <div class="pd-info-item"><span class="pd-label">来源</span><span class="pd-value">${UI.esc(p.acquisition_type || '—')}</span></div>
             <div class="pd-info-item"><span class="pd-label">成本价</span><span class="pd-value">${UI.money(p.cost_price)}</span></div>
             <div class="pd-info-item"><span class="pd-label">售价</span><span class="pd-value price">${UI.money(p.sale_price)}</span></div>
-            <div class="pd-info-item full"><span class="pd-label">单品利润</span><span class="pd-value" style="color:${profit >= 0 ? 'var(--green)' : 'var(--red)'};font-size:18px">${UI.money(profit)}</span></div>
+            <div class="pd-info-item full"><span class="pd-label">单品利润</span><span class="pd-value" style="color:${profit >= 0 ? 'var(--green)' : 'var(--red)'};font-size:18px">${UI.money(profit)}<span style="font-size:11px;color:var(--ink-300);margin-left:4px">${(+p.cost_price > 0) ? Math.round(profit / +p.cost_price * 100) : 0}%</span></span></div>
           </div>
           <div class="pd-actions">
-            <button class="btn btn-gold" onclick="Modules.assets.quickEditStatus('${p.id}')">修改状态</button>
+            <button class="btn btn-gold" onclick="Modules.assets.quickEditStatus('${p.id}')">🔄 修改状态</button>
+            ${p.status !== '已售出' ? `<button class="btn btn-sell" onclick="Modules.assets.quickSell('${p.id}')">💰 一键售出</button>` : ''}
             <button class="btn btn-ghost" onclick="document.getElementById('productDetailModal').remove()">关闭</button>
           </div>
         </div>
@@ -306,6 +311,31 @@ window.Modules.assets = {
     // 刷新弹窗
     document.getElementById('productDetailModal').remove();
     this.openProductDetail(id);
+  },
+
+  // 一键售出：改状态 + 建收入记录
+  quickSell(id) {
+    const d = Store.get();
+    const p = d.assets.products.find(p => p.id === id);
+    if (!p) return;
+    const np = this.normalizeProduct(p);
+    const salePrice = +np.sale_price || 0;
+    // 更新商品状态
+    Store.updateItem('products', id, { status: '已售出' }, 'assets');
+    // 创建收入记录
+    Store.addItem('income', {
+      amount: salePrice,
+      date: Store.todayStr(),
+      category: '商品销售',
+      note: `${np.brand} ${np.product_name}` + (np.acquisition_type ? ` (${np.acquisition_type})` : ''),
+      source: 'product_sell',
+    }, 'finance');
+    // 计算利润
+    const profit = salePrice - (+np.cost_price || 0);
+    UI.toast(`✅ 已售出！收入 +${UI.money(salePrice)}，利润 ${UI.money(profit)}`);
+    // 刷新页面
+    document.getElementById('productDetailModal')?.remove();
+    this.renderTab();
   },
 
   previewProductImage(input) {
@@ -370,6 +400,7 @@ window.Modules.assets = {
       cost_price,
       sale_price,
       status: get('p-status') || '库存中',
+      acquisition_type: get('p-source') || '',
       image: image,
     }, 'assets');
     this.renderTab(); UI.toast('商品已添加');
