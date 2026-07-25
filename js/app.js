@@ -12,6 +12,7 @@ const App = {
     'inspiration': { title: '灵感中心', module: 'inspiration' },
     'radar': { title: '爆款雷达', module: 'radar' },
     'review': { title: '内容复盘', module: 'review' },
+    'yesterday-review': { title: '昨日复盘', module: 'yesterdayReview' },
     'finance': { title: '财务管理', module: 'finance' },
     'english': { title: '英语学习', module: 'english' },
     'assets': { title: '我的资产库', module: 'assets' },
@@ -38,6 +39,9 @@ const App = {
 
     // === 加载数据（本地 + 云端） ===
     await Store.load();
+
+    // === 记录今日登录 ===
+    Store.recordLogin();
 
     // === 一次性初始化数据（合并 3 次 update 为 1 次，减少冗余推送） ===
     Store.update(data => {
@@ -179,19 +183,20 @@ const App = {
     if (!dot || !text) return;
 
     const cloudVer = Store.getCloudVersion();
+    const cloudErr = Store.getCloudError();
     dot.className = 'sync-dot';
     if (!Supa.getUserId()) {
       dot.classList.add('sync-off');
       text.textContent = '未登录';
+    } else if (cloudErr) {
+      dot.classList.add('sync-off');
+      text.textContent = '✗ ' + cloudErr;
+      text.title = '同步错误: ' + cloudErr;
     } else if (cloudVer) {
       dot.classList.add('sync-on');
       const d = new Date(cloudVer);
-      const now = new Date();
-      const diff = Math.floor((now - d) / 1000);
-      if (diff < 10) text.textContent = '已同步 · 刚刚';
-      else if (diff < 60) text.textContent = '已同步 · ' + diff + '秒前';
-      else if (diff < 3600) text.textContent = '已同步 · ' + Math.floor(diff / 60) + '分钟前';
-      else text.textContent = '已同步 · ' + Math.floor(diff / 3600) + '小时前';
+      text.textContent = '已同步 ' + d.toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+      text.title = '最后同步: ' + d.toLocaleString('zh-CN');
     } else {
       dot.classList.add('sync-on');
       text.textContent = '已连接';
@@ -200,10 +205,14 @@ const App = {
 
   showSyncInfo() {
     const cloudVer = Store.getCloudVersion();
-    const msg = cloudVer
-      ? '最后同步：' + new Date(cloudVer).toLocaleString('zh-CN')
-      : '尚未同步到云端，数据仅存在本地。';
-    UI.toast(msg);
+    const cloudErr = Store.getCloudError();
+    if (cloudErr) {
+      UI.toast('⚠ 同步错误: ' + cloudErr);
+    } else if (cloudVer) {
+      UI.toast('最后同步: ' + new Date(cloudVer).toLocaleString('zh-CN'));
+    } else {
+      UI.toast('尚未同步到云端，数据仅存在本地。');
+    }
   },
 
   // === 路由 ===
@@ -229,20 +238,21 @@ const App = {
     if (mnavSync) {
       mnavSync.addEventListener('click', async () => {
         UI.toast('正在同步...');
-        // 先推送到云端
         const pushed = await Store.pushNow();
         if (!pushed) {
-          UI.toast('❌ 推送失败，请检查网络');
+          const err = Store.getCloudError();
+          UI.toast('❌ 推送失败: ' + (err || '请检查网络'));
           return;
         }
-        // 再从云端拉取（确保双向同步）
         const pulled = await Store.pullFromCloud();
         if (pulled) {
           this.renderSyncStatus();
           this.renderStreak();
           this.route(this.current);
         }
-        UI.toast('同步完成 ✓');
+        const cloudVer = Store.getCloudVersion();
+        const timeStr = cloudVer ? new Date(cloudVer).toLocaleTimeString('zh-CN') : '';
+        UI.toast('同步完成 ✓ ' + timeStr);
       });
     }
   },
@@ -275,6 +285,9 @@ const App = {
     const streaks = d.meta.personalStreaks || {};
     const max = Math.max(streaks.fitness || 0, streaks.english || 0, streaks.learning || 0, streaks.spiritual || 0);
     document.getElementById('sidebarStreak').textContent = max || 0;
+    // 更新连续经营天数
+    const loginDaysEl = document.getElementById('sidebarLoginDays');
+    if (loginDaysEl) loginDaysEl.textContent = Store.getLoginStreak();
   },
 
   // === CEO 日报 ===
@@ -307,7 +320,22 @@ const App = {
     const dailyTarget = d.finance.dailyTarget || 4000;
     const targetGap = dailyTarget - todayIncome;
 
+    // 昨日复盘数据
+    const yestSnap = Store.getYesterdaySnapshot();
+
     body.innerHTML = `
+      <div class="ceo-section">
+        <div class="ceo-section-label">昨日复盘 📋</div>
+        <div class="ceo-section-body">
+          <ul>
+            <li>任务完成率：<b style="color:${yestSnap.rate >= 70 ? 'var(--green)' : 'var(--red)'}">${yestSnap.rate}%</b>（${yestSnap.done}/${yestSnap.total}）</li>
+            <li>昨日收入 <b style="color:var(--green)">${UI.money(yestSnap.income)}</b> · 支出 <b style="color:var(--red)">${UI.money(yestSnap.expense)}</b> · 净额 <b style="color:var(--gold-deep)">${UI.money(yestSnap.profit)}</b></li>
+            <li>内容发布：${yestSnap.reviewsCount} 条 · 客户跟进：${yestSnap.customersCount} 位</li>
+            <li>打卡：健身${yestSnap.yestStreaks.fitness?'✅':'❌'} 英语${yestSnap.yestStreaks.english?'✅':'❌'} 学习${yestSnap.yestStreaks.learning?'✅':'❌'} 灵修${yestSnap.yestStreaks.spiritual?'✅':'❌'}</li>
+            <li>Top3 完成：${yestSnap.topDone}/${yestSnap.topTotal}</li>
+          </ul>
+        </div>
+      </div>
       <div class="ceo-section">
         <div class="ceo-section-label">今日重点</div>
         <div class="ceo-section-body">
@@ -355,6 +383,7 @@ const App = {
   // === 本地模式（Supabase 未配置时的回退） ===
   async initLocalMode() {
     await Store.load();
+    Store.recordLogin();
     Store.update(data => {
       Store.ensureStreakHistory();
       const history = data.meta.streakHistory || {};

@@ -35,6 +35,10 @@ window.Modules.home = {
 
     // 成长打卡
     const streaks = d.meta.personalStreaks || { fitness: 0, english: 0, learning: 0, spiritual: 0 };
+    const loginStreak = Store.getLoginStreak();
+
+    // 昨日复盘快照
+    const yestSnap = Store.getYesterdaySnapshot();
 
     container.innerHTML = `
       <div class="view">
@@ -60,6 +64,33 @@ window.Modules.home = {
             <div class="stat-label">客户跟进</div>
             <div class="stat-value">${customersTotal}<span class="stat-unit">位</span></div>
             <div class="stat-foot">${customersToday} 位今日待跟进</div>
+          </div>
+        </div>
+
+        <!-- 昨日复盘 + 连续经营天数 -->
+        <div class="section-title">昨日复盘 · 连续经营第 ${loginStreak} 天</div>
+        <div class="yesterday-snapshot">
+          <div class="ys-item">
+            <div class="ys-label">任务完成率</div>
+            <div class="ys-value" style="color:${yestSnap.rate >= 70 ? 'var(--green)' : 'var(--red)'}">${yestSnap.rate}%</div>
+            <div class="ys-sub">${yestSnap.date} · ${yestSnap.done}/${yestSnap.total} 项</div>
+          </div>
+          <div class="ys-item">
+            <div class="ys-label">昨日收入</div>
+            <div class="ys-value" style="color:var(--green)">${UI.money(yestSnap.income)}</div>
+            <div class="ys-sub">支出 ${UI.money(yestSnap.expense)} · 净额 ${UI.money(yestSnap.profit)}</div>
+          </div>
+          <div class="ys-item">
+            <div class="ys-label">内容 / 客户</div>
+            <div class="ys-value">${yestSnap.reviewsCount} 条 / ${yestSnap.customersCount} 位</div>
+            <div class="ys-sub">Top3 完成 ${yestSnap.topDone}/${yestSnap.topTotal}</div>
+          </div>
+          <div class="ys-item">
+            <div class="ys-label">坚持打卡</div>
+            <div class="ys-value" style="font-size:18px">
+              ${yestSnap.yestStreaks.fitness ? '💪' : '—'} ${yestSnap.yestStreaks.english ? '🗣' : '—'} ${yestSnap.yestStreaks.learning ? '📚' : '—'} ${yestSnap.yestStreaks.spiritual ? '🙏' : '—'}
+            </div>
+            <div class="ys-sub">健身 英语 学习 灵修</div>
           </div>
         </div>
 

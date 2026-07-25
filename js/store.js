@@ -27,6 +27,11 @@ const Store = (function () {
         personalStreaks: { fitness: 0, english: 0, learning: 0, spiritual: 0 },
         streakHistory: { fitness: [], english: [], learning: [], spiritual: [] },
         lastStreakDate: today,
+        loginDates: [today],
+        loginDays: 1,
+        loginStreak: 1,
+        firstLoginDate: today,
+        lastLoginDate: today,
       },
       tasks: {
         topThree: [],
@@ -66,10 +71,10 @@ const Store = (function () {
           { id: uid(), name: '王太太', contact: '电话 138****', brand: 'Hermes', time: '2026-07-20', amount: 98000, preference: '限量款', budget: '80000-200000', frequency: '不定期', note: '高净值客户，推荐稀缺款', followUpTime: '', _updated: ts },
         ],
         products: [
-          { id: uid(), brand: 'Louis Vuitton', model: 'Neverfull MM', color: '经典老花', price: 8800, cost: 6500, stock: 3, demand: '高', profit: 2300, _updated: ts },
-          { id: uid(), brand: 'Chanel', model: 'Classic Flap 中号', color: '黑金', price: 52000, cost: 38000, stock: 1, demand: '极高', profit: 14000, _updated: ts },
-          { id: uid(), brand: 'Hermes', model: 'Birkin 25', color: '金棕', price: 98000, cost: 75000, stock: 1, demand: '极高', profit: 23000, _updated: ts },
-          { id: uid(), brand: 'Dior', model: 'Lady Dior 中号', color: '黑色', price: 38000, cost: 28000, stock: 2, demand: '中', profit: 10000, _updated: ts },
+          { id: uid(), product_name: 'Neverfull MM', brand: 'Louis Vuitton', category: '托特包', quantity: 3, cost_price: 6500, sale_price: 8800, status: '库存中', image: '', _updated: ts },
+          { id: uid(), product_name: 'Classic Flap 中号', brand: 'Chanel', category: '单肩包', quantity: 1, cost_price: 38000, sale_price: 52000, status: '库存中', image: '', _updated: ts },
+          { id: uid(), product_name: 'Birkin 25', brand: 'Hermes', category: '手提包', quantity: 1, cost_price: 75000, sale_price: 98000, status: '库存中', image: '', _updated: ts },
+          { id: uid(), product_name: 'Lady Dior 中号', brand: 'Dior', category: '单肩包', quantity: 2, cost_price: 28000, sale_price: 38000, status: '库存中', image: '', _updated: ts },
         ],
         deals: [
           { id: uid(), need: '通勤大容量包，预算1万内', process: '推荐 LV Neverfull，强调耐用与保值', price: 8800, reason: '客户看重实用+品牌认知，Neverfull 完美匹配', _updated: ts },
@@ -82,8 +87,10 @@ const Store = (function () {
 
   let data = null;
   let cloudUpdatedAt = null;
+  let cloudError = null;  // 最新同步错误信息
   let saveDebounceTimer = null;
   let _cloudBusy = false;  // 同步锁：防止并发 push/pull
+  let _lastSyncAttempt = 0; // 上次同步尝试时间戳，用于冷却
 
   // ========== 本地存储 ==========
 
@@ -105,22 +112,29 @@ const Store = (function () {
     clearTimeout(saveDebounceTimer);
     saveDebounceTimer = setTimeout(async () => {
       if (_cloudBusy) { console.log('[自动保存] 同步锁忙，稍后重试'); return; }
+      if (Date.now() - _lastSyncAttempt < 2000) { console.log('[自动保存] 冷却中，跳过'); return; } // 2秒冷却
       if (!Supa.getUserId()) { console.log('[自动保存] 未登录，跳过'); return; }
       _cloudBusy = true;
+      _lastSyncAttempt = Date.now();
+      cloudError = null;
       try {
         data._syncVersion = Date.now();
         const taskCount = (data.tasks.personalGrowth||[]).length + (data.tasks.business||[]).length + (data.tasks.contentGrowth||[]).length;
         console.log('[自动保存] 触发推送: tasks=', taskCount, 'customers=', (data.assets.customers||[]).length);
-        const ok = await Supa.pushAllData(data);
-        if (ok) {
+        const result = await Supa.pushAllData(data);
+        if (result && result.success !== false) {
           cloudUpdatedAt = new Date().toISOString();
+          cloudError = null;
           saveLocal();
           console.log('[自动保存] ✅ 推送成功, time:', cloudUpdatedAt);
         } else {
-          console.error('[自动保存] ❌ 推送失败');
+          const errMsg = (result && result.error) ? result.error : '未知错误';
+          cloudError = errMsg;
+          console.error('[自动保存] ❌ 推送失败:', errMsg);
         }
       } catch (e) {
-        console.error('[自动保存] 异常:', e);
+        cloudError = e.message || String(e);
+        console.error('[自动保存] 异常:', cloudError);
       } finally {
         _cloudBusy = false;
       }
@@ -131,22 +145,30 @@ const Store = (function () {
     clearTimeout(saveDebounceTimer);
     if (!Supa.getUserId()) { console.warn('[pushNow] 未登录，跳过'); return false; }
     if (_cloudBusy) { console.warn('[pushNow] 同步锁忙，跳过'); return false; }
+    if (Date.now() - _lastSyncAttempt < 2000) { console.log('[pushNow] 冷却中，跳过'); return false; }
     _cloudBusy = true;
+    _lastSyncAttempt = Date.now();
+    cloudError = null;
     try {
       data._syncVersion = Date.now();
       const taskCount = (data.tasks.personalGrowth||[]).length + (data.tasks.business||[]).length + (data.tasks.contentGrowth||[]).length;
       console.log('[pushNow] 推送: tasks=', taskCount, 'customers=', (data.assets.customers||[]).length, 'inspirations=', (data.inspirations||[]).length);
-      const ok = await Supa.pushAllData(data);
-      if (ok) {
+      const result = await Supa.pushAllData(data);
+      if (result && result.success !== false) {
         cloudUpdatedAt = new Date().toISOString();
+        cloudError = null;
         saveLocal();
         console.log('[pushNow] ✅ 推送成功, time:', cloudUpdatedAt);
+        return true;
       } else {
-        console.error('[pushNow] ❌ 推送失败');
+        const errMsg = (result && result.error) ? result.error : '推送失败：服务器无响应';
+        cloudError = errMsg;
+        console.error('[pushNow] ❌', errMsg);
+        return false;
       }
-      return ok;
     } catch (e) {
-      console.error('[pushNow] 异常:', e);
+      cloudError = e.message || String(e);
+      console.error('[pushNow] 异常:', cloudError);
       return false;
     } finally {
       _cloudBusy = false;
@@ -188,7 +210,9 @@ const Store = (function () {
   async function pullFromCloud() {
     if (!Supa.getUserId()) { console.warn('[pullFromCloud] 未登录，跳过'); return false; }
     if (_cloudBusy) { console.log('[pullFromCloud] 同步锁忙，跳过'); return false; }
+    if (Date.now() - _lastSyncAttempt < 2000) { console.log('[pullFromCloud] 冷却中，跳过'); return false; }
     _cloudBusy = true;
+    _lastSyncAttempt = Date.now();
     try {
       const remoteData = await Supa.pullAllData(data);
       if (!remoteData) { console.warn('[pullFromCloud] 拉取返回空'); return false; }
@@ -202,6 +226,7 @@ const Store = (function () {
 
       if (fpAfter !== fpBefore) {
         cloudUpdatedAt = new Date().toISOString();
+        cloudError = null;
         console.log('[pullFromCloud] ✅ 有新数据 (指纹变化), time:', cloudUpdatedAt);
         // 如果去重移除了条目，推送清理后的数据到云端
         const fpDedup = dataFingerprint(data);
@@ -214,7 +239,8 @@ const Store = (function () {
       console.log('[pullFromCloud] 指纹未变，跳过');
       return false;
     } catch (e) {
-      console.error('[pullFromCloud] 异常:', e);
+      cloudError = e.message || String(e);
+      console.error('[pullFromCloud] 异常:', cloudError);
       return false;
     } finally {
       _cloudBusy = false;
@@ -307,7 +333,7 @@ const Store = (function () {
     }
 
     // 合并灵感 / 雷达 / 复盘
-    ['inspirations', 'radar', 'reviews'].forEach(key => {
+    ['inspirations', 'radar', 'reviews', 'dailyReviews'].forEach(key => {
       result[key] = mergeArrayById(
         (local[key] || []), (remote[key] || [])
       );
@@ -335,6 +361,24 @@ const Store = (function () {
             (remote.meta.personalStreaks[pk] || 0)
           );
         });
+      }
+      // 合并登录天数
+      if (remote.meta.loginDates) {
+        const allLoginDates = Array.from(new Set(
+          ((local.meta && local.meta.loginDates) || []).concat(remote.meta.loginDates)
+        )).sort();
+        result.meta.loginDates = allLoginDates;
+        result.meta.loginDays = allLoginDates.length;
+        result.meta.loginStreak = calcLoginStreak(allLoginDates);
+      }
+      // 合并首次/最后登录日期
+      if (remote.meta.firstLoginDate) {
+        const localFirst = (local.meta && local.meta.firstLoginDate) || '';
+        result.meta.firstLoginDate = localFirst && localFirst < remote.meta.firstLoginDate ? localFirst : remote.meta.firstLoginDate;
+      }
+      if (remote.meta.lastLoginDate) {
+        const localLast = (local.meta && local.meta.lastLoginDate) || '';
+        result.meta.lastLoginDate = localLast > remote.meta.lastLoginDate ? localLast : remote.meta.lastLoginDate;
       }
     }
 
@@ -403,12 +447,32 @@ const Store = (function () {
     if (!data.meta.personalStreaks) {
       data.meta.personalStreaks = { fitness: 0, english: 0, learning: 0, spiritual: 0 };
     }
+    if (!data.meta.loginDates) {
+      data.meta.loginDates = [todayStr()];
+      data.meta.loginDays = 1;
+      data.meta.loginStreak = 1;
+      data.meta.firstLoginDate = todayStr();
+      data.meta.lastLoginDate = todayStr();
+    }
+    if (!data.meta.loginDays && data.meta.loginDates) {
+      data.meta.loginDays = data.meta.loginDates.length;
+    }
+    if (!data.meta.firstLoginDate) {
+      data.meta.firstLoginDate = data.meta.loginDates[0] || todayStr();
+    }
+    if (!data.meta.lastLoginDate) {
+      data.meta.lastLoginDate = data.meta.loginDates[data.meta.loginDates.length - 1] || todayStr();
+    }
+    if (!data.meta.loginStreak) {
+      data.meta.loginStreak = calcLoginStreak(data.meta.loginDates);
+    }
     if (!data.tasks) data.tasks = { topThree: [], personalGrowth: [], business: [], contentGrowth: [] };
     if (!data.finance) data.finance = { dailyTarget: 4000, income: [], expense: [] };
     if (!data.assets) data.assets = { customers: [], products: [], deals: [], contentAssets: [] };
     if (!data.inspirations) data.inspirations = [];
     if (!data.radar) data.radar = [];
     if (!data.reviews) data.reviews = [];
+    if (!data.dailyReviews) data.dailyReviews = [];
 
     // 去重（清理同步过程中产生的重复条目）
     const fpBefore = dataFingerprint(data);
@@ -449,6 +513,14 @@ const Store = (function () {
     });
   }
 
+  // 添加到根级别数组（非嵌套）
+  function addItemToList(collection, item) {
+    update(d => {
+      if (!d[collection]) d[collection] = [];
+      d[collection].unshift({ id: uid(), _updated: now(), ...item });
+    });
+  }
+
   function removeItem(collection, id, parent) {
     update(d => {
       const arr = parent ? d[parent][collection] : d[collection];
@@ -463,6 +535,98 @@ const Store = (function () {
       const idx = arr.findIndex(x => x.id === id);
       if (idx > -1) { Object.assign(arr[idx], patch); arr[idx]._updated = now(); }
     });
+  }
+
+  function yesterdayStr() {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
+  function recordLogin() {
+    const d = get();
+    if (!d.meta.loginDates) d.meta.loginDates = [];
+    const today = todayStr();
+    if (!d.meta.firstLoginDate) d.meta.firstLoginDate = today;
+    if (!d.meta.loginDates.includes(today)) {
+      d.meta.loginDates.push(today);
+      d.meta.loginDays = d.meta.loginDates.length;
+    }
+    // 更新最后登录日期和连续经营天数
+    d.meta.lastLoginDate = today;
+    d.meta.loginStreak = calcLoginStreak(d.meta.loginDates);
+    d._syncVersion = Date.now();
+    saveLocal();
+    scheduleCloudSave();
+  }
+
+  function getLoginDays() {
+    const d = get();
+    return d.meta.loginDays || (d.meta.loginDates ? d.meta.loginDates.length : 1);
+  }
+
+  // 计算连续经营天数（基于 loginDates 的日期连续性）
+  function calcLoginStreak(dates) {
+    if (!dates || !dates.length) return 0;
+    const sorted = [...new Set(dates)].sort().reverse();
+    const today = todayStr();
+    let expected = today;
+    let streak = 0;
+    for (const d of sorted) {
+      if (d === expected) {
+        streak++;
+        const dt = new Date(d + 'T00:00:00');
+        dt.setDate(dt.getDate() - 1);
+        expected = dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0');
+      } else if (d < expected) break;
+    }
+    return streak;
+  }
+
+  function getLoginStreak() {
+    const d = get();
+    if (!d.meta.loginDates || !d.meta.loginDates.length) return 0;
+    return calcLoginStreak(d.meta.loginDates);
+  }
+
+  // 获取昨天数据概况
+  function getYesterdaySnapshot() {
+    const d = get();
+    const yest = yesterdayStr();
+    const allTasks = [...d.tasks.personalGrowth, ...d.tasks.business, ...d.tasks.contentGrowth];
+    const total = allTasks.length;
+    const done = allTasks.filter(t => t.done).length;
+
+    const yestIncome = d.finance.income.filter(i => i.date === yest).reduce((s, i) => s + (+i.amount || 0), 0);
+    const yestExpense = d.finance.expense.filter(e => e.date === yest).reduce((s, e) => s + (+e.amount || 0), 0);
+    const yestReviews = (d.reviews || []).filter(r => r.date === yest).length;
+    const yestCustomers = d.assets.customers.filter(c => c.time === yest || c.followUpTime === yest).length;
+
+    // 打卡情况
+    Store.ensureStreakHistory();
+    const history = d.meta.streakHistory || {};
+    const yestStreaks = {};
+    ['fitness', 'english', 'learning', 'spiritual'].forEach(k => {
+      yestStreaks[k] = (history[k] || []).includes(yest);
+    });
+
+    // 已完成的top3
+    const yestTopIds = d.tasks.topThree || [];
+    const yestTopDone = yestTopIds.filter(id => allTasks.find(t => t.id === id && t.done)).length;
+
+    return {
+      date: yest,
+      total, done,
+      rate: total ? Math.round((done / total) * 100) : 0,
+      income: yestIncome,
+      expense: yestExpense,
+      profit: yestIncome - yestExpense,
+      reviewsCount: yestReviews,
+      customersCount: yestCustomers,
+      yestStreaks,
+      topDone: yestTopDone,
+      topTotal: yestTopIds.length,
+    };
   }
 
   function calcStreak(dates) {
@@ -489,6 +653,7 @@ const Store = (function () {
   }
 
   function getCloudVersion() { return cloudUpdatedAt; }
+  function getCloudError() { return cloudError; }
 
   // ========== 数据迁移 ==========
 
@@ -512,11 +677,12 @@ const Store = (function () {
 
   return {
     load, get, update, save,
-    addItem, removeItem, updateItem,
-    uid, todayStr,
+    addItem, removeItem, updateItem, addItemToList,
+    uid, todayStr, yesterdayStr,
     calcStreak, ensureStreakHistory,
+    recordLogin, getLoginDays, getLoginStreak, getYesterdaySnapshot,
     pushNow, pullFromCloud,
-    getCloudVersion,
+    getCloudVersion, getCloudError,
     seed, KEY,
     hasLegacyData, getLegacyData,
     deepMerge, mergeArrayById,

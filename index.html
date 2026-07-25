@@ -56,6 +56,10 @@
         <span class="nav-icon">❖</span>
         <span class="nav-label">内容复盘</span>
       </a>
+      <a class="nav-item" data-route="yesterday-review">
+        <span class="nav-icon">◷</span>
+        <span class="nav-label">昨日复盘</span>
+      </a>
       <a class="nav-item" data-route="finance">
         <span class="nav-icon">₣</span>
         <span class="nav-label">财务管理</span>
@@ -74,6 +78,10 @@
         <div class="streak-num" id="sidebarStreak">0</div>
         <div class="streak-label">连续完成天数</div>
       </div>
+      <div class="login-badge" id="loginBadge">
+        <div class="login-num" id="sidebarLoginDays">1</div>
+        <div class="login-label">连续经营天数</div>
+      </div>
       <div class="sync-indicator" id="syncIndicator" title="点击查看同步状态">
         <span class="sync-dot" id="syncDot"></span>
         <span class="sync-text" id="syncText">已连接</span>
@@ -88,6 +96,7 @@
       <div class="topbar-left">
         <h1 class="page-title" id="pageTitle">每日计划</h1>
         <span class="page-date" id="pageDate"></span>
+        <span class="login-days-badge" id="loginDaysBadge">🕒 连续经营第1天</span>
       </div>
       <div class="topbar-right">
         <!-- 同步状态指示器 -->
@@ -135,6 +144,10 @@
     <span class="mnav-icon">◆</span>
     <span class="mnav-label">任务</span>
   </a>
+  <a class="mnav-item" data-mroute="yesterday-review">
+    <span class="mnav-icon">◷</span>
+    <span class="mnav-label">复盘</span>
+  </a>
   <a class="mnav-item" data-mroute="assets">
     <span class="mnav-icon">◈</span>
     <span class="mnav-label">客户</span>
@@ -170,6 +183,7 @@
 <script src="js/modules/inspiration.js"></script>
 <script src="js/modules/radar.js"></script>
 <script src="js/modules/review.js"></script>
+<script src="js/modules/yesterday-review.js"></script>
 <script src="js/modules/finance.js"></script>
 <script src="js/modules/assets.js"></script>
 <script src="js/modules/english.js"></script>
@@ -190,19 +204,33 @@ setInterval(function () {
   var dot = document.getElementById('syncDotTop');
   var label = document.getElementById('syncLabel');
   var cloudVer = Store.getCloudVersion ? Store.getCloudVersion() : null;
+  var cloudErr = Store.getCloudError ? Store.getCloudError() : null;
   if (!dot || !label) return;
   dot.className = 'sync-dot-top';
   if (!Supa.getUserId || !Supa.getUserId()) {
     dot.classList.add('sync-off');
     label.textContent = '⚠ 离线';
+  } else if (cloudErr) {
+    dot.classList.add('sync-off');
+    label.textContent = '⚠ ' + cloudErr.substring(0, 15);
   } else if (cloudVer) {
     dot.classList.add('sync-on');
-    label.textContent = '☁ 已同步';
+    var d = new Date(cloudVer);
+    label.textContent = '☁ 已同步 ' + (d.getMonth()+1) + '/' + d.getDate() + ' ' +
+      String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
   } else {
     dot.classList.add('sync-on');
     label.textContent = '☁ 已连接';
   }
-}, 3000);
+  // 更新连续经营天数显示
+  var loginBadge = document.getElementById('loginDaysBadge');
+  var sidebarLogin = document.getElementById('sidebarLoginDays');
+  if (Store.getLoginStreak) {
+    var streak = Store.getLoginStreak();
+    if (loginBadge) loginBadge.textContent = '🕒 连续经营第' + streak + '天';
+    if (sidebarLogin) sidebarLogin.textContent = streak;
+  }
+}, 5000);
 </script>
 </body>
 </html>

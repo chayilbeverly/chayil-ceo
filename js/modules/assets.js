@@ -119,10 +119,29 @@ window.Modules.assets = {
   },
 
   // ===== 商品资产 =====
+  // normalizeProduct: 兼容旧数据格式
+  normalizeProduct(p) {
+    return {
+      id: p.id,
+      product_name: p.product_name || p.model || '',
+      brand: p.brand || '',
+      category: p.category || '',
+      quantity: p.quantity !== undefined ? p.quantity : (p.stock || 0),
+      cost_price: p.cost_price !== undefined ? p.cost_price : (p.cost || 0),
+      sale_price: p.sale_price !== undefined ? p.sale_price : (p.price || 0),
+      status: p.status || '库存中',
+      image: p.image || '',
+      _updated: p._updated || 0,
+    };
+  },
+
   renderProducts(el) {
-    const list = Store.get().assets.products;
-    const totalValue = list.reduce((s, p) => s + (+p.price || 0) * (+p.stock || 0), 0);
-    const totalProfit = list.reduce((s, p) => s + (+p.profit || 0), 0);
+    const rawList = Store.get().assets.products;
+    const list = rawList.map(p => this.normalizeProduct(p));
+    const totalValue = list.reduce((s, p) => s + (+p.sale_price || 0) * (+p.quantity || 0), 0);
+    const totalCost = list.reduce((s, p) => s + (+p.cost_price || 0) * (+p.quantity || 0), 0);
+    const totalProfit = list.reduce((s, p) => s + (+p.sale_price || 0) - (+p.cost_price || 0), 0);
+
     el.innerHTML = `
       <div class="board-col" style="margin-bottom:20px">
         <div class="board-col-head">
@@ -130,20 +149,28 @@ window.Modules.assets = {
         </div>
         <div class="card-body" style="padding:0 0 16px">
           <div class="form-grid">
-            <div class="form-field"><label class="form-label">品牌</label><input type="text" class="form-input" id="p-brand" placeholder="如 Chanel"></div>
-            <div class="form-field"><label class="form-label">型号</label><input type="text" class="form-input" id="p-model" placeholder="如 Classic Flap"></div>
-            <div class="form-field"><label class="form-label">颜色</label><input type="text" class="form-input" id="p-color" placeholder="如 黑金"></div>
-            <div class="form-field"><label class="form-label">售价</label><input type="number" class="form-input" id="p-price" placeholder="0"></div>
-            <div class="form-field"><label class="form-label">成本</label><input type="number" class="form-input" id="p-cost" placeholder="0"></div>
-            <div class="form-field"><label class="form-label">库存</label><input type="number" class="form-input" id="p-stock" placeholder="0"></div>
-            <div class="form-field"><label class="form-label">需求热度</label><select class="form-select" id="p-demand"><option>极高</option><option>高</option><option>中</option><option>低</option></select></div>
+            <div class="form-field"><label class="form-label">商品名称 *</label><input type="text" class="form-input" id="p-name" placeholder="如 Chanel CF"></div>
+            <div class="form-field"><label class="form-label">品牌 *</label><input type="text" class="form-input" id="p-brand" placeholder="如 Chanel"></div>
+            <div class="form-field"><label class="form-label">分类</label><select class="form-select" id="p-category"><option>托特包</option><option>单肩包</option><option>手提包</option><option>斜挎包</option><option>双肩包</option><option>钱包/卡包</option><option>腰带/配饰</option><option>鞋履</option><option>服装</option><option>其他</option></select></div>
+            <div class="form-field"><label class="form-label">数量</label><input type="number" class="form-input" id="p-quantity" placeholder="0" min="0"></div>
+            <div class="form-field"><label class="form-label">成本价 ¥</label><input type="number" class="form-input" id="p-cost" placeholder="0" step="0.01"></div>
+            <div class="form-field"><label class="form-label">售价 ¥</label><input type="number" class="form-input" id="p-price" placeholder="0" step="0.01"></div>
+            <div class="form-field"><label class="form-label">状态</label><select class="form-select" id="p-status"><option>库存中</option><option>已售出</option><option>预留</option></select></div>
+            <div class="form-field full">
+              <label class="form-label">商品图片</label>
+              <div class="image-upload-wrap">
+                <input type="file" class="form-input" id="p-image" accept="image/*" style="padding:7px 12px" onchange="Modules.assets.previewProductImage(this)">
+                <div class="image-preview" id="p-image-preview" style="display:none"></div>
+              </div>
+            </div>
           </div>
           <div class="form-actions"><button class="btn btn-gold btn-sm" onclick="Modules.assets.addProduct()">+ 添加商品</button></div>
         </div>
       </div>
 
-      <div class="fin-summary" style="grid-template-columns:repeat(3,1fr);margin-bottom:20px">
+      <div class="fin-summary" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px">
         <div class="fin-card"><div class="fin-label">库存总值</div><div class="fin-value income">${UI.money(totalValue)}</div></div>
+        <div class="fin-card"><div class="fin-label">库存成本</div><div class="fin-value expense">${UI.money(totalCost)}</div></div>
         <div class="fin-card"><div class="fin-label">预估总利润</div><div class="fin-value profit">${UI.money(totalProfit)}</div></div>
         <div class="fin-card"><div class="fin-label">在库商品</div><div class="fin-value" style="font-family:var(--ff-sans);font-size:26px">${list.length} 款</div></div>
       </div>
@@ -153,43 +180,171 @@ window.Modules.assets = {
         <div class="ai-section-content">${this.recommendProducts(list)}</div>
       </div>
 
-      <div style="overflow-x:auto">
-        <table class="data-table">
-          <thead><tr><th>品牌</th><th>型号</th><th>颜色</th><th>售价</th><th>成本</th><th>利润</th><th>库存</th><th>需求</th><th></th></tr></thead>
-          <tbody>
-            ${list.map(p => `
-              <tr>
-                <td><b>${UI.esc(p.brand)}</b></td>
-                <td>${UI.esc(p.model)}</td>
-                <td>${UI.esc(p.color)}</td>
-                <td class="num">${UI.money(p.price)}</td>
-                <td class="num">${UI.money(p.cost || 0)}</td>
-                <td class="num" style="color:var(--green)">${UI.money(p.profit || (+(p.price||0) - +(p.cost||0)))}</td>
-                <td>${p.stock}</td>
-                <td><span class="record-tag" style="background:${p.demand==='极高'||p.demand==='高'?'var(--gold-glow)':'var(--bg-soft)'};color:${p.demand==='极高'||p.demand==='高'?'var(--gold-deep)':'var(--ink-500)'}">${UI.esc(p.demand)}</span></td>
-                <td><button class="task-del" style="opacity:1" onclick="Modules.assets.del('products','${p.id}')">×</button></td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
+      <!-- 状态筛选 -->
+      <div class="cat-filter-wrap" style="margin-bottom:14px">
+        <div class="cat-filters">
+          <span class="cat-tag active" onclick="Modules.assets.filterProducts('all',this)">全部</span>
+          <span class="cat-tag" onclick="Modules.assets.filterProducts('库存中',this)">🟢 库存中</span>
+          <span class="cat-tag" onclick="Modules.assets.filterProducts('已售出',this)">🔴 已售出</span>
+          <span class="cat-tag" onclick="Modules.assets.filterProducts('预留',this)">🟡 预留</span>
+        </div>
+      </div>
+
+      <!-- 商品卡片网格 -->
+      <div class="product-card-grid" id="productCardGrid">
+        ${list.map(p => this.renderProductCard(p)).join('')}
       </div>
     `;
+  },
+
+  filterProducts(status, el) {
+    document.querySelectorAll('#productCardGrid + .cat-filter-wrap .cat-tag, .cat-filter-wrap .cat-tag').forEach(t => t.classList.remove('active'));
+    if (el) el.classList.add('active');
+
+    const rawList = Store.get().assets.products;
+    const list = rawList.map(p => this.normalizeProduct(p));
+    const filtered = status === 'all' ? list : list.filter(p => p.status === status);
+
+    const grid = document.getElementById('productCardGrid');
+    if (grid) {
+      grid.innerHTML = filtered.map(p => this.renderProductCard(p)).join('');
+    }
+  },
+
+  renderProductCard(p) {
+    const profit = (+p.sale_price || 0) - (+p.cost_price || 0);
+    const statusColors = { '库存中': 'var(--green)', '已售出': 'var(--ink-300)', '预留': 'var(--gold-deep)' };
+    const statusBg = { '库存中': 'rgba(91,140,106,0.08)', '已售出': 'var(--bg-soft)', '预留': 'var(--gold-glow)' };
+
+    return `
+    <div class="product-card-v2" onclick="Modules.assets.openProductDetail('${p.id}')">
+      <div class="pcv2-img">
+        ${p.image ? `<img src="${UI.esc(p.image)}" alt="${UI.esc(p.product_name)}">` : '<span class="pcv2-noimg">📷</span>'}
+        <span class="pcv2-status" style="background:${statusBg[p.status] || 'var(--bg-soft)'};color:${statusColors[p.status] || 'var(--ink-500)'}">${UI.esc(p.status)}</span>
+      </div>
+      <div class="pcv2-info">
+        <div class="pcv2-name">${UI.esc(p.product_name)}</div>
+        <div class="pcv2-brand">${UI.esc(p.brand)}${p.category ? ' · ' + UI.esc(p.category) : ''}</div>
+        <div class="pcv2-stats">
+          <div class="pcv2-stat">
+            <span class="pcv2-stat-label">数量</span>
+            <span class="pcv2-stat-val">${p.quantity}</span>
+          </div>
+          <div class="pcv2-stat">
+            <span class="pcv2-stat-label">成本</span>
+            <span class="pcv2-stat-val">${UI.money(p.cost_price)}</span>
+          </div>
+          <div class="pcv2-stat">
+            <span class="pcv2-stat-label">售价</span>
+            <span class="pcv2-stat-val price">${UI.money(p.sale_price)}</span>
+          </div>
+          <div class="pcv2-stat">
+            <span class="pcv2-stat-label">利润</span>
+            <span class="pcv2-stat-val" style="color:${profit >= 0 ? 'var(--green)' : 'var(--red)'}">${UI.money(profit)}</span>
+          </div>
+        </div>
+      </div>
+      <button class="pcv2-del" onclick="event.stopPropagation();Modules.assets.del('products','${p.id}')" title="删除">×</button>
+    </div>`;
+  },
+
+  openProductDetail(id) {
+    const rawList = Store.get().assets.products;
+    const raw = rawList.find(p => p.id === id);
+    if (!raw) return;
+    const p = this.normalizeProduct(raw);
+    const profit = (+p.sale_price || 0) - (+p.cost_price || 0);
+
+    // 创建模态窗口
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay show';
+    overlay.id = 'productDetailModal';
+    overlay.innerHTML = `
+      <div class="modal product-detail-modal">
+        <div class="modal-header" style="border-bottom:none;padding-bottom:0">
+          <div>
+            <div class="modal-eyebrow">商品详情</div>
+            <h2 class="modal-title">${UI.esc(p.product_name)}</h2>
+          </div>
+          <button class="modal-close" onclick="document.getElementById('productDetailModal').remove()">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="pd-image-wrap">
+            ${p.image ? `<img src="${UI.esc(p.image)}" class="pd-image" alt="${UI.esc(p.product_name)}">` : '<div class="pd-noimage">📷 暂无图片</div>'}
+          </div>
+          <div class="pd-info-grid">
+            <div class="pd-info-item"><span class="pd-label">品牌</span><span class="pd-value">${UI.esc(p.brand)}</span></div>
+            <div class="pd-info-item"><span class="pd-label">分类</span><span class="pd-value">${UI.esc(p.category || '—')}</span></div>
+            <div class="pd-info-item"><span class="pd-label">数量</span><span class="pd-value">${p.quantity}</span></div>
+            <div class="pd-info-item"><span class="pd-label">状态</span><span class="pd-value">${UI.esc(p.status)}</span></div>
+            <div class="pd-info-item"><span class="pd-label">成本价</span><span class="pd-value">${UI.money(p.cost_price)}</span></div>
+            <div class="pd-info-item"><span class="pd-label">售价</span><span class="pd-value price">${UI.money(p.sale_price)}</span></div>
+            <div class="pd-info-item full"><span class="pd-label">单品利润</span><span class="pd-value" style="color:${profit >= 0 ? 'var(--green)' : 'var(--red)'};font-size:18px">${UI.money(profit)}</span></div>
+          </div>
+          <div class="pd-actions">
+            <button class="btn btn-gold" onclick="Modules.assets.quickEditStatus('${p.id}')">修改状态</button>
+            <button class="btn btn-ghost" onclick="document.getElementById('productDetailModal').remove()">关闭</button>
+          </div>
+        </div>
+      </div>
+    `;
+    overlay.addEventListener('click', e => {
+      if (e.target.id === 'productDetailModal') overlay.remove();
+    });
+    document.body.appendChild(overlay);
+  },
+
+  quickEditStatus(id) {
+    const d = Store.get();
+    const p = d.assets.products.find(p => p.id === id);
+    if (!p) return;
+    const statuses = ['库存中', '已售出', '预留'];
+    const current = p.status || '库存中';
+    const next = statuses[(statuses.indexOf(current) + 1) % statuses.length];
+    Store.updateItem('products', id, { status: next }, 'assets');
+    UI.toast('状态已改为：' + next);
+    // 刷新弹窗
+    document.getElementById('productDetailModal').remove();
+    this.openProductDetail(id);
+  },
+
+  previewProductImage(input) {
+    const previewEl = document.getElementById('p-image-preview');
+    if (!input.files || !input.files[0]) {
+      previewEl.style.display = 'none';
+      return;
+    }
+    const file = input.files[0];
+    if (file.size > 2 * 1024 * 1024) {
+      UI.toast('图片太大，请选择小于 2MB 的图片');
+      input.value = '';
+      previewEl.style.display = 'none';
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      previewEl.style.display = 'block';
+      previewEl.innerHTML = `<img src="${e.target.result}" style="width:120px;height:120px;object-fit:cover;border-radius:8px;border:2px solid var(--line)">`;
+    };
+    reader.readAsDataURL(file);
   },
 
   recommendProducts(list) {
     if (!list.length) return '暂无商品数据。';
     const customers = Store.get().assets.customers;
     const tips = [];
-    const hot = list.filter(p => p.demand === '极高' || p.demand === '高');
-    if (hot.length) tips.push(`高需求商品 ${hot.length} 款：${hot.map(p => UI.esc(p.brand + ' ' + p.model)).join('、')}。`);
-    const lowStock = list.filter(p => +p.stock <= 1);
-    if (lowStock.length) tips.push(`库存预警：${lowStock.map(p => UI.esc(p.brand + ' ' + p.model)).join('、')} 库存≤1。`);
+    // 库存预警
+    const lowStock = list.filter(p => +p.quantity <= 1 && p.status === '库存中');
+    if (lowStock.length) tips.push(`库存预警：${lowStock.map(p => UI.esc(p.brand + ' ' + p.product_name)).join('、')} 库存≤1。`);
+    const active = list.filter(p => p.status === '库存中');
+    tips.push(`在库商品 ${active.length} 款，${list.length - active.length} 款已售/预留。`);
     if (customers.length) {
       customers.slice(0, 2).forEach(c => {
         const match = list.filter(p => (p.brand || '').toLowerCase().includes((c.brand || '').toLowerCase()));
         if (match.length) {
-          const best = match.sort((a, b) => +a.price - +b.price)[0];
-          tips.push(`客户 <b>${UI.esc(c.name)}</b> → 推荐 <b>${UI.esc(best.brand + ' ' + best.model)}</b>（${UI.money(best.price)}）。`);
+          const best = match.sort((a, b) => (+a.sale_price || 0) - (+b.sale_price || 0))[0];
+          const name = best.product_name || '';
+          tips.push(`客户 <b>${UI.esc(c.name)}</b> → 推荐 <b>${UI.esc(best.brand + ' ' + name)}</b>（${UI.money(best.sale_price)}）。`);
         }
       });
     }
@@ -199,13 +354,23 @@ window.Modules.assets = {
 
   addProduct() {
     const get = id => document.getElementById(id).value.trim();
-    if (!get('p-brand') || !get('p-model')) { UI.toast('请输入品牌和型号'); return; }
-    const price = +get('p-price') || 0;
-    const cost = +get('p-cost') || 0;
+    if (!get('p-name') || !get('p-brand')) { UI.toast('请输入商品名称和品牌'); return; }
+    const sale_price = +get('p-price') || 0;
+    const cost_price = +get('p-cost') || 0;
+    let image = '';
+    const previewImg = document.querySelector('#p-image-preview img');
+    if (previewImg && previewImg.src) {
+      image = previewImg.src;
+    }
     Store.addItem('products', {
-      brand: get('p-brand'), model: get('p-model'), color: get('p-color'),
-      price, cost, stock: +get('p-stock') || 0, demand: get('p-demand'),
-      profit: price - cost,
+      product_name: get('p-name'),
+      brand: get('p-brand'),
+      category: get('p-category'),
+      quantity: +get('p-quantity') || 0,
+      cost_price,
+      sale_price,
+      status: get('p-status') || '库存中',
+      image: image,
     }, 'assets');
     this.renderTab(); UI.toast('商品已添加');
   },
