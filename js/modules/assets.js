@@ -165,9 +165,9 @@ window.Modules.assets = {
                 <label class="image-upload-btn" for="p-image">
                   <span class="image-upload-icon">📷</span>
                   <span class="image-upload-text">点击上传图片</span>
-                  <span class="image-upload-hint">支持拍照/相册，小于2MB</span>
+                  <span class="image-upload-hint">支持拍照 / 相册选择，自动压缩</span>
                 </label>
-                <input type="file" class="form-input image-upload-input" id="p-image" accept="image/*" capture="environment" onchange="Modules.assets.previewProductImage(this)">
+                <input type="file" class="form-input image-upload-input" id="p-image" accept="image/*" onchange="Modules.assets.previewProductImage(this)">
                 <div class="image-preview" id="p-image-preview" style="display:none"></div>
               </div>
             </div>
@@ -343,7 +343,36 @@ window.Modules.assets = {
     this.renderTab();
   },
 
-  previewProductImage(input) {
+  // 图片自动压缩：Canvas 缩放 + JPEG 质量压缩
+  compressImage(file, maxDim = 1280, quality = 0.85) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const img = new Image();
+        img.onload = function() {
+          let w = img.width, h = img.height;
+          // 按最长边等比缩放
+          if (w > maxDim || h > maxDim) {
+            if (w >= h) { h = Math.round(h * maxDim / w); w = maxDim; }
+            else { w = Math.round(w * maxDim / h); h = maxDim; }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, w, h);
+          // 统一输出 JPEG，体积最小且兼容性最好
+          const dataUrl = canvas.toDataURL('image/jpeg', quality);
+          resolve(dataUrl);
+        };
+        img.onerror = () => reject(new Error('图片加载失败'));
+        img.src = e.target.result;
+      };
+      reader.onerror = () => reject(new Error('图片读取失败'));
+      reader.readAsDataURL(file);
+    });
+  },
+
+  async previewProductImage(input) {
     const previewEl = document.getElementById('p-image-preview');
     const uploadBtn = input.previousElementSibling; // label button
     if (!input.files || !input.files[0]) {
@@ -353,22 +382,28 @@ window.Modules.assets = {
       return;
     }
     const file = input.files[0];
-    if (file.size > 2 * 1024 * 1024) {
-      UI.toast('图片太大，请选择小于 2MB 的图片');
+    // 显示压缩中状态
+    previewEl.style.display = 'block';
+    previewEl.className = 'image-preview has-image';
+    previewEl.innerHTML = '<div style="padding:30px;text-align:center;color:var(--ink-400);font-size:13px">⏳ 正在处理图片…</div>';
+
+    try {
+      const compressed = await this.compressImage(file);
+      // 压缩后仍然过大（>2MB）则降低质量重试
+      let finalUrl = compressed;
+      const sizeKb = Math.round(compressed.length * 0.75 / 1024);
+      if (sizeKb > 2048) {
+        finalUrl = await this.compressImage(file, 1024, 0.7);
+      }
+      previewEl.innerHTML = `<img src="${finalUrl}" style="width:100%;max-height:240px;object-fit:contain;border-radius:8px;border:2px solid var(--line)"><button type="button" class="image-change-btn" onclick="event.preventDefault();document.getElementById('p-image').click()">✎ 更换图片</button>`;
+      if (uploadBtn) uploadBtn.style.display = 'none';
+    } catch (err) {
+      UI.toast('图片处理失败，请重试');
       input.value = '';
       previewEl.style.display = 'none';
       previewEl.className = 'image-preview';
       if (uploadBtn) uploadBtn.style.display = '';
-      return;
     }
-    const reader = new FileReader();
-    reader.onload = function(e) {
-      previewEl.style.display = 'block';
-      previewEl.className = 'image-preview has-image';
-      previewEl.innerHTML = `<img src="${e.target.result}" style="width:100%;max-height:240px;object-fit:contain;border-radius:8px;border:2px solid var(--line)"><button type="button" class="image-change-btn" onclick="event.preventDefault();document.getElementById('p-image').click()">✎ 更换图片</button>`;
-      if (uploadBtn) uploadBtn.style.display = 'none';
-    };
-    reader.readAsDataURL(file);
   },
 
   recommendProducts(list) {
