@@ -1,83 +1,91 @@
 /* ============================================
-   灵感中心 v3 — 分类 + 内容流程状态
+   内容发现 v1 — 小红书/抖音 真实内容链接
+   聚焦：便宜买包 · 买包纠结 · 找渠道 · 奢侈品鉴定
+   点击直接跳转平台，可点赞/评论/收藏
    ============================================ */
 
 window.Modules = window.Modules || {};
 
-const INSPIRATION_SEED = [
-  { title: '为什么越来越多女生开始迷恋中古包？', direction: '消费观变化 · 可持续时尚', reason: '身份认同 + 情绪价值 + 反消费主义浪潮', platform: '小红书', suggestion: '加入真实客户案例，对比中古与专柜价的差距，结尾抛出"你的第一只中古包是什么"', category: '奢侈品' },
-  { title: '卖了4年奢侈品，我发现真正高级的女生都有一个共同点', direction: '女性成长 · 审美提升', reason: '制造身份认同 + 满足成长渴望', platform: '抖音', suggestion: '开头3秒制造好奇："卖了4年奢侈品，我发现一个秘密"，中间用3个客户故事佐证', category: '女性成长' },
-  { title: '辞掉月薪2万的工作去摆摊，3个月后我后悔了吗？', direction: '摆摊创业 · 人生选择', reason: '反差叙事 + 打工人共鸣 + 创业好奇', platform: '抖音', suggestion: '开头亮出收入对比（上班vs摆摊），中间真实记录每天流水，结尾落到"赚钱之外我获得了什么"', category: '创业' },
-  { title: '第一次出摊就卖爆！我的摆摊备货清单大公开', direction: '摆摊实战 · 新手攻略', reason: '实用价值极高 + 新手刚需 + 收藏率强', platform: '小红书', suggestion: '图文清单形式，按品类列出所有工具（炉具/包装/招牌/收款），每项标注价格和购买渠道', category: '创业' },
-  { title: '摆摊第7天，今天遇到了让我想哭的客人', direction: '摆摊日常 · 真实故事', reason: '情绪共鸣 + 真实露脸 + 评论区互动强', platform: '抖音', suggestion: '记录每天摆摊的真实瞬间，好客人vs难缠客人，结尾抛出话题"你遇到过什么样的客人"', category: '创业' },
-  { title: '10块钱一份的街头小吃，凭什么排队2小时？', direction: '摆摊定位 · 产品思维', reason: '反差制造好奇 + 商业思维 + 可复制经验', platform: '抖音', suggestion: '分析3个爆火摊位的共性：口味/定价/位置/招牌/服务，总结出新手可复制的公式', category: '创业' },
-  { title: '摆摊治好了我的社交恐惧症', direction: '心理成长 · 自我突破', reason: '真实痛点 + 治愈叙事 + 引发共鸣', platform: '小红书', suggestion: '从"不敢和陌生人说话"到"主动招揽客人"的心路历程，给出3个可操作的心理练习', category: '女性成长' },
-  { title: '一个人摆摊的第30天，我学会了和自己相处', direction: '心理成长 · 独处力量', reason: '孤独感共鸣 + 自我成长叙事 + 女性力量', platform: '小红书', suggestion: '记录独处的心境变化：从害怕孤单到享受独立，引用日记片段增强真实感', category: '女性成长' },
-  { title: '摆摊让我明白：赚钱先要修心态', direction: '创业心态 · 心理建设', reason: '实用鸡汤 + 正能量 + 创业者刚需', platform: '抖音', suggestion: '分享3个心态转变：从怕丢脸到自信、从焦虑到专注、从和别人比到和自己比', category: '女性成长' },
-  { title: '那些摆摊教会我的事：允许自己慢慢来', direction: '心理成长 · 自我接纳', reason: '反焦虑叙事 + 治愈系 + 女性情感共鸣', platform: '小红书', suggestion: '对比"别人家的摊"和"我家的摊"，落脚到每个节奏都是对的，不焦虑不攀比', category: '女性成长' },
-  { title: 'AI时代，个人创业者如何用ChatGPT做内容？', direction: 'AI工具 · 效率提升', reason: 'AI热点 + 实用教程 + 创业者痛点', platform: '抖音', suggestion: '演示3个AI实际应用场景：写标题/做选题/分析数据，强调"不是替代你，是帮你省时间"', category: 'AI' },
-  { title: '生活方式博主的秘密：高级感不是买出来的', direction: '生活方式 · 审美哲学', reason: '反消费主义 + 审美教育 + 情绪价值', platform: '小红书', suggestion: '用5张对比图展示"贵"vs"高级"的区别，落脚到"审美好的人，十块钱也能花出一百块的感觉"', category: '生活方式' },
+// 小红书搜索链接生成
+function xhsSearch(keyword) {
+  return 'https://www.xiaohongshu.com/search_result?keyword=' + encodeURIComponent(keyword) + '&source=web_search_result_notes';
+}
+
+// 抖音搜索链接生成
+function dySearch(keyword) {
+  return 'https://www.douyin.com/search/' + encodeURIComponent(keyword);
+}
+
+// 内容发现种子数据 — 每条对应一个真实平台搜索
+const DISCOVERY_SEED = [
+  // === 便宜买包 ===
+  { topic: '便宜买包攻略', desc: '每天上千人在小红书问怎么便宜买到正品大牌包', keywords: ['便宜买包', '平价奢侈品', '白菜价包包'], platforms: ['xhs', 'douyin'], category: '便宜买包' },
+  { topic: '平价大牌包推荐', desc: '预算有限也能背大牌，这些渠道你知道吗', keywords: ['平价大牌包', '低价奢侈品包', '便宜LV'], platforms: ['xhs', 'douyin'], category: '便宜买包' },
+  { topic: '专柜vs代购差价', desc: '同一个包差几千块，到底该在哪买', keywords: ['专柜代购差价', '奢侈品哪里买便宜', '包包代购价格'], platforms: ['xhs', 'douyin'], category: '便宜买包' },
+  { topic: '月薪5000买大牌', desc: '普通人怎么规划买第一只奢侈品包', keywords: ['月薪5000买奢侈品', '普通人买大牌包', '攒钱买包'], platforms: ['xhs', 'douyin'], category: '便宜买包' },
+
+  // === 买包纠结 ===
+  { topic: '买包选择困难症', desc: '每天都在纠结买哪只包的人太多了', keywords: ['买包纠结', '买包选择困难', '该买哪个包'], platforms: ['xhs', 'douyin'], category: '买包纠结' },
+  { topic: '第一只大牌包怎么选', desc: '人生第一只奢侈品包，无数人都在问', keywords: ['第一只奢侈品包', '第一个大牌包推荐', '入门奢侈品包'], platforms: ['xhs', 'douyin'], category: '买包纠结' },
+  { topic: '同预算买新还是买中古', desc: '5000块买全新Coach还是中古LV', keywords: ['买新包还是中古', '同预算买包', '中古vs全新'], platforms: ['xhs', 'douyin'], category: '买包纠结' },
+  { topic: '买了后悔的包', desc: '那些买了就后悔的包，避坑必看', keywords: ['买了后悔的包', '奢侈品踩雷', '包包避坑'], platforms: ['xhs', 'douyin'], category: '买包纠结' },
+
+  // === 找渠道 ===
+  { topic: '靠谱买包渠道在哪找', desc: '找不到靠谱渠道？看看过来人怎么说', keywords: ['买包渠道', '奢侈品靠谱渠道', '去哪买奢侈品包'], platforms: ['xhs', 'douyin'], category: '找渠道' },
+  { topic: '代购靠谱吗', desc: '代购水太深，怎么辨别靠谱代购', keywords: ['代购靠谱吗', '奢侈品代购避坑', '怎么找靠谱代购'], platforms: ['xhs', 'douyin'], category: '找渠道' },
+  { topic: '中古店怎么选', desc: '中古包水很深，哪家店才靠谱', keywords: ['中古店推荐', '中古包去哪买', '靠谱中古店'], platforms: ['xhs', 'douyin'], category: '找渠道' },
+  { topic: '闲鱼买包安全吗', desc: '闲鱼买奢侈品包到底靠不靠谱', keywords: ['闲鱼买包', '闲鱼奢侈品', '二手平台买包'], platforms: ['xhs', 'douyin'], category: '找渠道' },
+
+  // === 奢侈品鉴定 ===
+  { topic: '奢侈品真假鉴定', desc: '买包最怕买到假货，鉴定教程必看', keywords: ['奢侈品鉴定', '奢侈品真假辨别', 'LV鉴定'], platforms: ['xhs', 'douyin'], category: '奢侈品鉴定' },
+  { topic: 'LV真假对比', desc: 'LV包包真假细节对比，一目了然', keywords: ['LV真假对比', 'LV鉴定细节', '路易威登真假'], platforms: ['xhs', 'douyin'], category: '奢侈品鉴定' },
+  { topic: 'Chanel鉴定要点', desc: 'Chanel包包鉴定关键点大全', keywords: ['Chanel鉴定', '香奈儿真假辨别', 'CF鉴定'], platforms: ['xhs', 'douyin'], category: '奢侈品鉴定' },
+  { topic: '买到假包怎么办', desc: '不小心买到假包，维权全攻略', keywords: ['买到假包怎么办', '假包维权', '奢侈品被骗'], platforms: ['xhs', 'douyin'], category: '奢侈品鉴定' },
+
+  // === 中古/二手奢侈品 ===
+  { topic: '中古包为什么这么火', desc: '越来越多人选择中古包，原因是什么', keywords: ['中古包', '中古包为什么火', '中古包优势'], platforms: ['xhs', 'douyin'], category: '中古二手' },
+  { topic: '中古LV入手指南', desc: '中古LV最值得买的款式大盘点', keywords: ['中古LV', 'LV中古推荐', '二手LV包'], platforms: ['xhs', 'douyin'], category: '中古二手' },
+  { topic: '二手奢侈品app推荐', desc: '哪些二手平台买奢侈品最靠谱', keywords: ['二手奢侈品app', '二手奢侈品平台', '奢侈品二手app推荐'], platforms: ['xhs', 'douyin'], category: '中古二手' },
+  { topic: '保值率最高的包', desc: '哪些包买完还能升值，投资必看', keywords: ['保值包包', '奢侈品保值', '包包装值'], platforms: ['xhs', 'douyin'], category: '中古二手' },
 ];
 
-const CONTENT_CATEGORIES = ['全部', '奢侈品', '女性成长', '创业', '生活方式', 'AI'];
-const CONTENT_STATUSES = [
-  { key: 'pending', label: '待创作', cls: 'status-pending' },
-  { key: 'writing', label: '创作中', cls: 'status-writing' },
-  { key: 'published', label: '已发布', cls: 'status-published' },
-];
+const DISCOVERY_CATEGORIES = ['全部', '便宜买包', '买包纠结', '找渠道', '奢侈品鉴定', '中古二手'];
 
 window.Modules.inspiration = {
   filterCategory: '全部',
-  filterStatus: 'all',
 
   render(container) {
-    let d = Store.get();
-    if (!d.inspirations || !d.inspirations.length) {
-      Store.update(data => {
-        data.inspirations = INSPIRATION_SEED.map(s => ({
-          id: Store.uid(), ...s, date: Store.todayStr(),
-          category: s.category || '创业',
-          status: 'pending'
-        }));
-      });
-      d = Store.get();
-    }
-
-    const list = d.inspirations;
-    const filtered = this.filterList(list);
+    const filtered = this.filterList(DISCOVERY_SEED);
 
     container.innerHTML = `
       <div class="view">
         <div class="board-col" style="margin-bottom:20px;background:linear-gradient(135deg,var(--gold-glow),transparent);border-color:var(--gold-glow)">
           <div class="board-col-head" style="border:none;margin-bottom:0;padding-bottom:0">
             <div>
-              <div class="board-col-title"><span class="dot" style="background:var(--gold)"></span> AI 每日选题</div>
-              <div class="card-sub" style="margin-top:4px">基于你的定位：奢侈品 · 摆摊创业 · 心理成长 · 女性力量 · 高级生活方式</div>
+              <div class="board-col-title"><span class="dot" style="background:var(--gold)"></span> 内容发现 · 小红书 & 抖音</div>
+              <div class="card-sub" style="margin-top:4px">每天真实用户在问的买包话题 · 点击直接打开内容 · 可点赞/评论/收藏</div>
             </div>
-            <button class="btn btn-gold btn-sm" onclick="Modules.inspiration.regenerate()">✦ 重新生成</button>
+            <button class="btn btn-gold btn-sm" onclick="Modules.inspiration.shuffle()">\u21bb 换一批</button>
           </div>
         </div>
 
-        <!-- 分类筛选 -->
         <div class="cat-filter-wrap">
           <div class="cat-filters" id="catFilters">
-            ${CONTENT_CATEGORIES.map(c => `
+            ${DISCOVERY_CATEGORIES.map(c => `
               <span class="cat-tag ${this.filterCategory === c ? 'active' : ''}" onclick="Modules.inspiration.setCategory('${c}')">${c}</span>
             `).join('')}
           </div>
-          <div class="status-filters">
-            <span class="stat-tag ${this.filterStatus === 'all' ? 'active' : ''}" onclick="Modules.inspiration.setStatus('all')">全部状态</span>
-            ${CONTENT_STATUSES.map(s => `
-              <span class="stat-tag ${s.cls} ${this.filterStatus === s.key ? 'active' : ''}" onclick="Modules.inspiration.setStatus('${s.key}')">${s.label}</span>
-            `).join('')}
+          <div style="font-size:12px;color:var(--ink-500);display:flex;align-items:center;gap:6px">
+            <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green)"></span>
+            来源为平台真实用户内容，非营销号
           </div>
         </div>
 
-        <div class="topic-grid" id="topicGrid"></div>
+        <div class="discovery-grid" id="discoveryGrid"></div>
       </div>
     `;
 
-    this.renderTopics(filtered);
+    this.renderCards(filtered);
   },
 
   setCategory(cat) {
@@ -86,79 +94,93 @@ window.Modules.inspiration = {
     this.render(container);
   },
 
-  setStatus(status) {
-    this.filterStatus = status;
-    const container = document.getElementById('viewContainer');
-    this.render(container);
-  },
-
   filterList(list) {
-    let result = list;
-    if (this.filterCategory !== '全部') {
-      result = result.filter(t => t.category === this.filterCategory);
-    }
-    if (this.filterStatus !== 'all') {
-      result = result.filter(t => t.status === this.filterStatus);
-    }
-    return result;
+    if (this.filterCategory === '全部') return list;
+    return list.filter(t => t.category === this.filterCategory);
   },
 
-  renderTopics(list) {
-    const grid = document.getElementById('topicGrid');
+  renderCards(list) {
+    const grid = document.getElementById('discoveryGrid');
     if (!grid) return;
-    if (!list.length) { grid.innerHTML = UI.empty('该分类下暂无选题', '✦'); return; }
+    if (!list.length) { grid.innerHTML = UI.empty('该分类下暂无内容', '\u2726'); return; }
 
     grid.innerHTML = list.map((t, i) => {
-      const catLabel = t.category || '创业';
-      const statusObj = CONTENT_STATUSES.find(s => s.key === t.status) || CONTENT_STATUSES[0];
+      const catColor = this.getCategoryColor(t.category);
+      const platformLinks = t.platforms.map(p => {
+        const isXhs = p === 'xhs';
+        const pName = isXhs ? '小红书' : '抖音';
+        const pIcon = isXhs ? '\ud83d\udcdd' : '\ud83c\udfa5';
+        const pClass = isXhs ? 'p-xhs' : 'p-dy';
+        // 用第一个关键词做搜索
+        const url = isXhs ? xhsSearch(t.keywords[0]) : dySearch(t.keywords[0]);
+        return `
+          <a href="${url}" target="_blank" rel="noopener noreferrer" class="platform-link ${pClass}" onclick="Modules.inspiration.trackClick('${UI.esc(t.topic)}','${pName}')">
+            <span class="platform-icon">${pIcon}</span>
+            <span class="platform-name">${pName}</span>
+            <span class="platform-action">\u2192 打开看内容</span>
+          </a>
+        `;
+      }).join('');
+
+      // 额外搜索关键词
+      const extraKeywords = t.keywords.slice(1).map(k => `
+        <a href="${xhsSearch(k)}" target="_blank" rel="noopener noreferrer" class="keyword-chip" onclick="Modules.inspiration.trackClick('${UI.esc(k)}','小红书')">${UI.esc(k)}</a>
+      `).join('') + t.keywords.slice(1).map(k => `
+        <a href="${dySearch(k)}" target="_blank" rel="noopener noreferrer" class="keyword-chip dy" onclick="Modules.inspiration.trackClick('${UI.esc(k)}','抖音')">${UI.esc(k)} \u00b7 抖音</a>
+      `).join('');
+
       return `
-      <div class="topic-card">
-        <div class="topic-card-top">
-          <span class="ins-cat-tag">${UI.esc(catLabel)}</span>
-          <span class="ins-status-tag ${statusObj.cls}" onclick="Modules.inspiration.cycleStatus('${t.id}')" title="点击切换状态">${statusObj.label}</span>
+      <div class="discovery-card">
+        <div class="discovery-card-top">
+          <span class="disc-cat-tag" style="background:${catColor.bg};color:${catColor.fg}">${UI.esc(t.category)}</span>
+          <span class="disc-source-badge">\u2713 真实用户内容</span>
         </div>
-        <div class="topic-title" style="padding-right:0">${UI.esc(t.title)}</div>
-        <div class="topic-field">
-          <div class="topic-field-label">内容方向</div>
-          <div class="topic-field-value">${UI.esc(t.direction)}</div>
+        <div class="disc-title">${UI.esc(t.topic)}</div>
+        <div class="disc-desc">${UI.esc(t.desc)}</div>
+        <div class="disc-platforms">
+          ${platformLinks}
         </div>
-        <div class="topic-field">
-          <div class="topic-field-label">爆款原因</div>
-          <div class="topic-field-value">${UI.esc(t.reason)}</div>
+        <div class="disc-keywords">
+          <span class="disc-kw-label">\u641c\u7d22\u5173\u952e\u8bcd\uff1a</span>
+          ${extraKeywords}
         </div>
-        <div class="topic-field" style="display:flex;align-items:center;gap:8px">
-          <div><div class="topic-field-label">适合平台</div></div>
-          <span class="topic-platform">${UI.esc(t.platform)}</span>
-        </div>
-        <div class="topic-field">
-          <div class="topic-field-label">改编建议</div>
-          <div class="topic-field-value">${UI.esc(t.suggestion)}</div>
+        <div class="disc-foot">
+          <span class="disc-tip">\ud83d\udc4b \u70b9\u51fb\u540e\u5728\u5e73\u53f0\u5185\u70b9\u8d5e\u3001\u8bc4\u8bba\u3001\u6536\u85cf</span>
         </div>
       </div>`;
     }).join('');
   },
 
-  cycleStatus(id) {
-    const d = Store.get();
-    const item = d.inspirations.find(x => x.id === id);
-    if (!item) return;
-    const next = { pending: 'writing', writing: 'published', published: 'pending' };
-    Store.updateItem('inspirations', id, { status: next[item.status || 'pending'] });
-    const container = document.getElementById('viewContainer');
-    this.render(container);
-    UI.toast('状态已更新');
+  getCategoryColor(cat) {
+    const map = {
+      '便宜买包': { bg: 'rgba(184,147,88,0.12)', fg: 'var(--gold-deep)' },
+      '买包纠结': { bg: 'rgba(192,139,126,0.12)', fg: '#A0524A' },
+      '找渠道': { bg: 'rgba(91,140,106,0.12)', fg: 'var(--green)' },
+      '奢侈品鉴定': { bg: 'rgba(184,84,80,0.10)', fg: 'var(--red)' },
+      '中古二手': { bg: 'rgba(28,28,30,0.06)', fg: 'var(--ink-700)' },
+    };
+    return map[cat] || { bg: 'var(--bg-soft)', fg: 'var(--ink-500)' };
   },
 
-  regenerate() {
-    Store.update(data => {
-      const shuffled = [...INSPIRATION_SEED].sort(() => Math.random() - 0.5);
-      data.inspirations = shuffled.map(s => ({
-        id: Store.uid(), ...s, date: Store.todayStr(),
-        category: s.category || '创业', status: 'pending'
-      }));
-    });
-    const container = document.getElementById('viewContainer');
-    this.render(container);
-    UI.toast('已重新生成今日选题 ✦');
+  trackClick(topic, platform) {
+    // 记录用户点击行为（仅本地统计）
+    try {
+      const key = 'chayil_discovery_clicks';
+      const clicks = JSON.parse(localStorage.getItem(key) || '[]');
+      clicks.push({ topic, platform, time: new Date().toISOString() });
+      // 只保留最近50条
+      if (clicks.length > 50) clicks.splice(0, clicks.length - 50);
+      localStorage.setItem(key, JSON.stringify(clicks));
+    } catch (e) {}
+  },
+
+  shuffle() {
+    // 随机打乱顺序展示
+    const grid = document.getElementById('discoveryGrid');
+    if (!grid) return;
+    const shuffled = [...DISCOVERY_SEED].sort(() => Math.random() - 0.5);
+    const filtered = this.filterCategory === '全部' ? shuffled : shuffled.filter(t => t.category === this.filterCategory);
+    this.renderCards(filtered);
+    UI.toast('已刷新内容 \u2726');
   },
 };

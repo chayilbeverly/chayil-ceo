@@ -9,7 +9,7 @@ const App = {
   routes: {
     'home': { title: 'CEO 驾驶舱', module: 'home' },
     'daily-plan': { title: '每日计划', module: 'dailyPlan' },
-    'inspiration': { title: '灵感中心', module: 'inspiration' },
+    'inspiration': { title: '内容发现', module: 'inspiration' },
     'radar': { title: '爆款雷达', module: 'radar' },
     'review': { title: '内容复盘', module: 'review' },
     'yesterday-review': { title: '昨日复盘', module: 'yesterdayReview' },
@@ -55,13 +55,7 @@ const App = {
         data.meta.personalStreaks[k] = Store.calcStreak(history[k]);
       });
 
-      // 预填充灵感与爆款数据
-      if ((!data.inspirations || !data.inspirations.length) && typeof INSPIRATION_SEED !== 'undefined') {
-        data.inspirations = INSPIRATION_SEED.map(s => ({
-          id: Store.uid(), ...s, _updated: Date.now(), date: Store.todayStr(),
-          category: s.category || '创业', status: 'pending'
-        }));
-      }
+      // 预填充爆款数据
       if ((!data.radar || !data.radar.length) && typeof RADAR_SEED !== 'undefined') {
         data.radar = RADAR_SEED.map(s => ({
           id: Store.uid(), ...s, _updated: Date.now(), date: Store.todayStr(),
@@ -325,13 +319,13 @@ const App = {
 
     body.innerHTML = `
       <div class="ceo-section">
-        <div class="ceo-section-label">昨日复盘 📋</div>
+        <div class="ceo-section-label">昨日复盘 \ud83d\udccb</div>
         <div class="ceo-section-body">
           <ul>
             <li>任务完成率：<b style="color:${yestSnap.rate >= 70 ? 'var(--green)' : 'var(--red)'}">${yestSnap.rate}%</b>（${yestSnap.done}/${yestSnap.total}）</li>
             <li>昨日收入 <b style="color:var(--green)">${UI.money(yestSnap.income)}</b> · 支出 <b style="color:var(--red)">${UI.money(yestSnap.expense)}</b> · 净额 <b style="color:var(--gold-deep)">${UI.money(yestSnap.profit)}</b></li>
             <li>内容发布：${yestSnap.reviewsCount} 条 · 客户跟进：${yestSnap.customersCount} 位</li>
-            <li>打卡：健身${yestSnap.yestStreaks.fitness?'✅':'❌'} 英语${yestSnap.yestStreaks.english?'✅':'❌'} 学习${yestSnap.yestStreaks.learning?'✅':'❌'} 灵修${yestSnap.yestStreaks.spiritual?'✅':'❌'}</li>
+            <li>打卡：健身${yestSnap.yestStreaks.fitness?'\u2705':'\u274c'} 英语${yestSnap.yestStreaks.english?'\u2705':'\u274c'} 学习${yestSnap.yestStreaks.learning?'\u2705':'\u274c'} 灵修${yestSnap.yestStreaks.spiritual?'\u2705':'\u274c'}</li>
             <li>Top3 完成：${yestSnap.topDone}/${yestSnap.topTotal}</li>
           </ul>
         </div>
@@ -339,7 +333,7 @@ const App = {
       <div class="ceo-section">
         <div class="ceo-section-label">今日重点</div>
         <div class="ceo-section-body">
-          ${undone.length ? `<ul>${undone.map(t => `<li>${UI.esc(t.text)}</li>`).join('')}</ul>` : '<p>今日任务已全部完成，给自己一杯好咖啡 ☕</p>'}
+          ${undone.length ? `<ul>${undone.map(t => `<li>${UI.esc(t.text)}</li>`).join('')}</ul>` : '<p>今日任务已全部完成，给自己一杯好咖啡 \u2615</p>'}
         </div>
       </div>
       <div class="ceo-section">
@@ -347,7 +341,7 @@ const App = {
         <div class="ceo-section-body">
           <ul>
             <li>今日收入 <b style="color:var(--green)">${UI.money(todayIncome)}</b>，支出 <b style="color:var(--red)">${UI.money(todayExpense)}</b>，净额 <b style="color:var(--gold-deep)">${UI.money(todayIncome - todayExpense)}</b></li>
-            <li>日目标 ${UI.money(dailyTarget)}，${targetGap > 0 ? `还差 <b style="color:var(--red)">${UI.money(targetGap)}</b>` : '已达成 ✓'}</li>
+            <li>日目标 ${UI.money(dailyTarget)}，${targetGap > 0 ? `还差 <b style="color:var(--red)">${UI.money(targetGap)}</b>` : '已达成 \u2713'}</li>
             <li>本月累计：收入 ${UI.money(monthIncome)} · 利润 ${UI.money(monthProfit)}</li>
             <li>待跟进客户：${d.assets.customers.length} 位在册，建议今日主动触达 2-3 位高复购客户</li>
           </ul>
@@ -356,13 +350,13 @@ const App = {
       <div class="ceo-section">
         <div class="ceo-section-label">行业热点</div>
         <div class="ceo-section-body">
-          ${topRadar ? `<p><b>${UI.esc(topRadar.title)}</b></p><p style="color:var(--ink-500);font-size:12px">爆款原因：${UI.esc((topRadar.reasons||[]).slice(0,2).join('；'))}</p>` : '<p>今日暂无热点</p>'}
+          ${topRadar ? `<p><b>${UI.esc(topRadar.title)}</b></p><p style="color:var(--ink-500);font-size:12px">爆款原因：${UI.esc((topRadar.reasons||[]).slice(0,2).join('\uff1b'))}</p>` : '<p>今日暂无热点</p>'}
         </div>
       </div>
       <div class="ceo-section">
-        <div class="ceo-section-label">内容建议</div>
+        <div class="ceo-section-label">内容发现</div>
         <div class="ceo-section-body">
-          ${topTopic ? `<p>今日推荐选题：<b>${UI.esc(topTopic.title)}</b></p><p style="color:var(--ink-500);font-size:12px">方向：${UI.esc(topTopic.direction)} · 适合平台：${UI.esc(topTopic.platform)}</p>` : '<p>前往灵感中心查看今日选题</p>'}
+          ${topTopic ? `<p>今日推荐选题：<b>${UI.esc(topTopic.title)}</b></p><p style="color:var(--ink-500);font-size:12px">方向：${UI.esc(topTopic.direction)} · 适合平台：${UI.esc(topTopic.platform)}</p>` : '<p>前往内容发现查看今日买包话题</p>'}
         </div>
       </div>
       <div class="ceo-section">
@@ -393,9 +387,6 @@ const App = {
         if (!history[k]) history[k] = [];
         data.meta.personalStreaks[k] = Store.calcStreak(history[k]);
       });
-      if ((!data.inspirations || !data.inspirations.length) && typeof INSPIRATION_SEED !== 'undefined') {
-        data.inspirations = INSPIRATION_SEED.map(s => ({ id: Store.uid(), ...s, _updated: Date.now(), date: Store.todayStr(), category: s.category || '创业', status: 'pending' }));
-      }
       if ((!data.radar || !data.radar.length) && typeof RADAR_SEED !== 'undefined') {
         data.radar = RADAR_SEED.map(s => ({ id: Store.uid(), ...s, _updated: Date.now(), date: Store.todayStr(), bookmarked: false, emotionPoint: s.emotionPoint || '', myAdaptation: s.myAdaptation || '' }));
       }

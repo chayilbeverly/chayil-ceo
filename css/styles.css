@@ -2417,3 +2417,194 @@ ul { list-style: none; }
     overscroll-behavior-y: contain;
   }
 }
+
+/* ============================================
+   内容发现模块 (Discovery)
+   ============================================ */
+.discovery-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 18px;
+}
+.discovery-card {
+  background: var(--bg-card);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-lg);
+  padding: 22px 24px;
+  transition: all 0.25s ease;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+.discovery-card:hover {
+  border-color: var(--gold-glow);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-3px);
+}
+.discovery-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.disc-cat-tag {
+  display: inline-block;
+  padding: 3px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+.disc-source-badge {
+  font-size: 10px;
+  color: var(--green);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 500;
+}
+.disc-source-badge::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+}
+.disc-title {
+  font-family: var(--ff-serif);
+  font-size: 19px;
+  font-weight: 600;
+  color: var(--ink-900);
+  margin-bottom: 8px;
+  line-height: 1.35;
+}
+.disc-desc {
+  font-size: 13px;
+  color: var(--ink-500);
+  line-height: 1.6;
+  margin-bottom: 16px;
+}
+.disc-platforms {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+.platform-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: var(--r-sm);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: all 0.22s ease;
+  border: 1px solid transparent;
+  -webkit-tap-highlight-color: transparent;
+}
+.platform-link:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
+}
+.platform-link.p-xhs {
+  background: #FFF0F0;
+  color: #C8403E;
+  border-color: rgba(200,64,62,0.15);
+}
+.platform-link.p-xhs:hover {
+  background: #FFE5E5;
+  border-color: rgba(200,64,62,0.3);
+}
+.platform-link.p-dy {
+  background: #1A1A1D;
+  color: #fff;
+  border-color: rgba(26,26,29,0.3);
+}
+.platform-link.p-dy:hover {
+  background: #2A2A2E;
+}
+.platform-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+.platform-action {
+  font-size: 11px;
+  opacity: 0.8;
+  font-weight: 400;
+}
+.disc-keywords {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+.disc-kw-label {
+  font-size: 11px;
+  color: var(--ink-300);
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+.keyword-chip {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  background: var(--bg-soft);
+  color: var(--ink-500);
+  text-decoration: none;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+  -webkit-tap-highlight-color: transparent;
+}
+.keyword-chip:hover {
+  background: var(--bg-hover);
+  color: var(--ink-700);
+  border-color: var(--line);
+}
+.keyword-chip.dy {
+  background: rgba(26,26,29,0.04);
+  color: var(--ink-500);
+}
+.keyword-chip.dy:hover {
+  background: rgba(26,26,29,0.08);
+}
+.disc-foot {
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px solid var(--line-soft);
+}
+.disc-tip {
+  font-size: 11px;
+  color: var(--ink-300);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+@media (max-width: 1100px) {
+  .discovery-grid {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 768px) {
+  .discovery-card {
+    padding: 16px 18px;
+  }
+  .disc-title {
+    font-size: 17px;
+  }
+  .platform-link {
+    flex: 1;
+    justify-content: center;
+    padding: 12px 14px;
+    font-size: 14px;
+  }
+  .platform-action {
+    display: none;
+  }
+  .disc-platforms {
+    gap: 8px;
+  }
+}

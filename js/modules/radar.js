@@ -1,78 +1,79 @@
 /* ============================================
-   爆款雷达 v3 — AI拆解模板 + 收藏
+   爆款雷达 v4 — 奢侈品包包垂直领域
+   已清除所有摆摊内容，聚焦买包/奢侈品
    ============================================ */
 
 window.Modules = window.Modules || {};
 
 const RADAR_SEED = [
   {
-    title: '普通女生如何提升高级感？3个细节立刻不一样',
-    platform: 'douyin', views: 1280000, likes: 89200, comments: 6800, saves: 12400,
-    reasons: ['制造身份焦虑，触发"我也想变高级"的心理', '满足女性成长与审美提升需求', '评论区争议强，"高级感"定义引发讨论'],
-    emotionPoint: '身份焦虑 + 对"变好"的渴望',
-    structure: '抛出问题 → 3个反常识细节 → 前后对比 → 金句收尾',
+    title: '月薪5000也能背大牌！平价买包攻略大公开',
+    platform: 'douyin', views: 2800000, likes: 196000, comments: 18500, saves: 89000,
+    reasons: ['收入与消费的反差引发好奇', '实用攻略内容收藏率极高', '评论区大量"求渠道""求链接"互动'],
+    emotionPoint: '希望感 + "我也可以"的心理',
+    structure: '收入开篇 \u2192 预算规划 \u2192 3个平价渠道 \u2192 避坑提醒 \u2192 互动收尾',
     myAdaptation: '',
     recreate: {
-      title: '卖了4年奢侈品，我发现真正高级的女生都有这5个习惯',
-      hook: '做了4年奢侈品，接触过上千个高消费女生，我发现真正高级的人，反而最简单',
-      structure: '① 开头3秒抛出反常识观点 → ② 3个真实客户故事 → ③ 总结5个习惯 → ④ 引导关注',
-      shot: '真人口播 + 门店空镜穿插，自然光，低饱和度调色，配轻爵士BGM',
+      title: '卖了4年奢侈品，我告诉你月薪5000怎么买大牌包',
+      hook: '别被专柜价格吓退，我做了4年奢侈品，今天告诉你3个渠道，同样的包能省一半',
+      structure: '\u2460 开头亮出差价对比 \u2192 \u2461 3个靠谱渠道逐一分析 \u2192 \u2462 每个渠道适合什么人 \u2192 \u2463 避坑3条铁律',
+      shot: '真人口播 + 手机录屏价格对比 + 实物展示，自然光，清晰为主',
     },
   },
   {
-    title: '90后女生摆摊月入5万：一碗面养活一家人',
-    platform: 'douyin', views: 4500000, likes: 320000, comments: 28500, saves: 89000,
-    reasons: ['真实摆摊故事引发共鸣，收入数字制造反差', '女性独立创业话题自带流量', '评论区大量"求带""求配方"互动'],
-    emotionPoint: '羡慕 + "我也可以"的希望感',
-    structure: '真实收入开篇 → 辛苦过程 → 转折点 → 成果展示 → 鼓励收尾',
+    title: '第一只奢侈品包怎么选？LV/Chanel/Gucci新手指南',
+    platform: 'xhs', views: 1500000, likes: 128000, comments: 9800, saves: 156000,
+    reasons: ['新手刚需内容，搜索量巨大', '品牌对比引发讨论', '图文形式收藏率爆表'],
+    emotionPoint: '选择焦虑 + 对"第一只"的仪式感',
+    structure: '预算分层 \u2192 品牌特点 \u2192 经典款推荐 \u2192 搭配建议 \u2192 互动收尾',
     myAdaptation: '',
     recreate: {
-      title: '辞掉工作摆摊第30天，我的真实收入公开',
-      hook: '很多人问我摆摊到底赚不赚钱，今天我打开手机，给你们看30天的完整流水',
-      structure: '① 开头亮出30天收入截图 → ② 分解成本和利润 → ③ 3个新手必踩的坑 → ④ 3条建议',
-      shot: '实拍出摊画面 + 手机录屏流水 + 口播，自然光线，真实不加滤镜',
+      title: '做了4年奢侈品，我建议你的第一只大牌包选这几款',
+      hook: '很多人问我第一只奢侈品包买什么，我接触过上万只包，今天给你最实在的建议',
+      structure: '\u2460 按预算分3档 \u2192 \u2461 每档推荐2-3款 \u2192 \u2462 为什么推荐这几款 \u2192 \u2463 评论区告诉我你的预算',
+      shot: '图文合集 + 实物试背 + 价格标注，干净背景，高级感排版',
     },
   },
   {
-    title: '全网最全摆摊选址攻略：这5个位置千万别去',
-    platform: 'xhs', views: 2800000, likes: 186000, comments: 15600, saves: 142000,
-    reasons: ['实用刚需内容，每个想摆摊的人都必须看', '"千万别去"反向标题制造紧迫感', '信息密度高，收藏率爆表'],
-    emotionPoint: '焦虑（怕选错位置亏钱）+ 安全需求',
-    structure: '位置重要性开场 → 5类坑位逐一解析 → 3步选址法 → 互动收尾',
+    title: '代购水有多深？3分钟教你辨别靠谱代购',
+    platform: 'douyin', views: 3200000, likes: 245000, comments: 22000, saves: 134000,
+    reasons: ['行业揭秘类内容天然吸引流量', '实用避坑内容收藏率极高', '评论区大量真实经历分享'],
+    emotionPoint: '安全感需求 + 怕被骗的焦虑',
+    structure: '痛点开篇 \u2192 假代购3个特征 \u2192 靠谱代购5个标准 \u2192 验货流程 \u2192 互动收尾',
     myAdaptation: '',
     recreate: {
-      title: '摆摊3个月踩过的坑：选址篇——好位置和差位置差10倍收入',
-      hook: '同样的食物，位置差一条街，一天少赚2000块，我用真实对比告诉你',
-      structure: '① 收入对比 → ② 5类坑位详解 → ③ 3步选址法 → ④ 互动"你在哪个城市"',
-      shot: '实拍地图标注 + 现场对比视频 + 手机画线标注，信息图风格',
+      title: '做了4年奢侈品，教你3秒辨别靠谱代购',
+      hook: '代购水有多深？我见过太多人花几万块买到假货，今天把我的辨别方法全告诉你',
+      structure: '\u2460 假代购3个特征 \u2192 \u2461 靠谱代购5个标准 \u2192 \u2462 验货3步法 \u2192 \u2463 评论区说说你的经历',
+      shot: '真人口播 + 手机录屏案例 + 实物对比，节奏明快',
     },
   },
   {
-    title: '摆摊后我才发现：真正治愈我的不是赚钱',
-    platform: 'xhs', views: 3600000, likes: 267000, comments: 32000, saves: 95000,
-    reasons: ['反套路叙事——大家都在说赚钱，你说治愈', '情绪价值拉满，女性用户强烈共鸣', '从摆摊话题切入心理成长，跨圈传播'],
-    emotionPoint: '治愈 + 共鸣 + "原来我不是一个人"',
-    structure: '反套路开篇 → 摆摊前的状态 → 3个心理变化 → 日记片段 → 共鸣收尾',
+    title: '中古包为什么越来越火？看完你就懂了',
+    platform: 'xhs', views: 980000, likes: 76000, comments: 6200, saves: 112000,
+    reasons: ['中古趋势话题自带流量', '性价比叙事引发共鸣', '环保/反消费主义标签扩大传播'],
+    emotionPoint: '认同感 + "聪明消费"的自豪',
+    structure: '现象开篇 \u2192 中古vs专柜对比 \u2192 3个核心优势 \u2192 入门建议 \u2192 互动收尾',
     myAdaptation: '',
     recreate: {
-      title: '一个人摆摊的第45天，我治好了自己的精神内耗',
-      hook: '以前每天晚上焦虑到2点睡不着，现在收摊倒头就睡，不是因为累，而是我找到了比赚钱更重要的东西',
-      structure: '① 摆摊前的精神内耗状态 → ② 摆摊后3个心理变化 → ③ 写给自己的一封信 → ④ 邀请分享',
-      shot: '傍晚收摊镜头 + 日记手写特写 + 城市夜景延时，暖色调，轻钢琴BGM',
+      title: '卖了4年中古包，我告诉你为什么聪明人都在买中古',
+      hook: '同样的包，中古比专柜便宜一半，但90%的人不敢买，今天我把真相告诉你',
+      structure: '\u2460 中古包价格优势对比 \u2192 \u2461 3个核心优势 \u2192 \u2462 新手怎么入门 \u2192 \u2463 给姐妹3条建议',
+      shot: '实物展示 + 价格对比 + 中古店探店画面，暖色调，复古感',
     },
   },
   {
-    title: '32岁裸辞摆摊：我终于不再用别人的标准活',
-    platform: 'douyin', views: 5200000, likes: 410000, comments: 38000, saves: 67000,
-    reasons: ['年龄焦虑+裸辞+摆摊三重话题叠加', '对抗社会时钟的反叛叙事引发强烈共鸣', '"活出自己"价值观触动大量女性用户'],
-    emotionPoint: '释放 + 勇气 + "做自己"的渴望',
-    structure: '30岁独白开篇 → 裸辞决定 → 摆摊生活对比 → 3句话鼓励 → 互动收尾',
+    title: 'LV Neverfull真假对比：细节决定一切',
+    platform: 'douyin', views: 4500000, likes: 312000, comments: 28500, saves: 198000,
+    reasons: ['LV最热门款鉴定需求巨大', '真假对比视觉冲击力强', '实用内容收藏率极高'],
+    emotionPoint: '安全感 + 怕吃亏的心理',
+    structure: '真假并排展示 \u2192 5个关键细节逐一对比 \u2192 总结口诀 \u2192 互动收尾',
     myAdaptation: '',
     recreate: {
-      title: '30岁后，我用一辆小推车换回了自己的人生',
-      hook: '30岁生日那天，我没有吹蜡烛，我递了辞职信。2个月后，我在夜市推着小车，笑得比上班5年加起来都多',
-      structure: '① 30岁危机独白 → ② 摆摊2个月对比 → ③ 给姐妹3句话 → ④ 评论区聊聊',
-      shot: '自我叙事风格，穿插摆摊画面和独处镜头，柔光+手写体字幕，情感饱满',
+      title: '做了4年奢侈品，LV Neverfull真假我一眼就能看出来',
+      hook: 'Neverfull是LV最火的包，也是假货最多的，今天教你5个细节，以后再也不怕买到假的',
+      structure: '\u2460 真假并排展示 \u2192 \u2461 5个关键细节对比 \u2192 \u2462 一句口诀总结 \u2192 \u2463 评论区发图我帮你看',
+      shot: '特写镜头 + 真假对比 + 手势标注，高清微距，专业感',
     },
   },
 ];
@@ -100,11 +101,11 @@ window.Modules.radar = {
           <div class="board-col-head" style="border:none;margin-bottom:0;padding-bottom:0">
             <div>
               <div class="board-col-title"><span class="dot" style="background:var(--red)"></span> 今日爆款雷达</div>
-              <div class="card-sub" style="margin-top:4px">筛选：摆摊创业 · 心理成长 · 奢侈品 · 女性 · 情绪价值</div>
+              <div class="card-sub" style="margin-top:4px">聚焦：奢侈品包包 \u00b7 买包攻略 \u00b7 中古鉴定 \u00b7 渠道避坑</div>
             </div>
             <div style="display:flex;gap:8px">
-              ${bookmarked.length ? `<button class="btn btn-ghost btn-sm" onclick="Modules.radar.showBookmarked()">★ 收藏 (${bookmarked.length})</button>` : ''}
-              <button class="btn btn-gold btn-sm" onclick="Modules.radar.refresh()">◎ 刷新雷达</button>
+              ${bookmarked.length ? `<button class="btn btn-ghost btn-sm" onclick="Modules.radar.showBookmarked()">\u2605 收藏 (${bookmarked.length})</button>` : ''}
+              <button class="btn btn-gold btn-sm" onclick="Modules.radar.refresh()">\u25ce 刷新雷达</button>
             </div>
           </div>
         </div>
@@ -119,14 +120,14 @@ window.Modules.radar = {
     const list = Store.get().radar.filter(r => r.bookmarked);
     const el = document.getElementById('radarList');
     if (!el) return;
-    if (!list.length) { el.innerHTML = UI.empty('暂无收藏的爆款', '★'); return; }
+    if (!list.length) { el.innerHTML = UI.empty('暂无收藏的爆款', '\u2605'); return; }
     this.renderList(list);
   },
 
   renderList(list) {
     const el = document.getElementById('radarList');
     if (!el) return;
-    if (!list.length) { el.innerHTML = UI.empty('今日暂无匹配爆款', '◎'); return; }
+    if (!list.length) { el.innerHTML = UI.empty('今日暂无匹配爆款', '\u25ce'); return; }
 
     const colors = ['#8A6E3F', '#B85450', '#5B8C6A'];
     el.innerHTML = list.map((v, i) => {
@@ -143,7 +144,7 @@ window.Modules.radar = {
             <span class="radar-platform-tag ${v.platform}">${pName}</span>
             <span class="radar-platform-tag" style="background:var(--gold-glow);color:var(--gold-deep)">${v.date || Store.todayStr()}</span>
             <button class="bookmark-btn ${isBookmarked ? 'active' : ''}" onclick="Modules.radar.toggleBookmark('${v.id}')" title="收藏">
-              ${isBookmarked ? '★ 已收藏' : '☆ 收藏'}
+              ${isBookmarked ? '\u2605 已收藏' : '\u2606 收藏'}
             </button>
             <div class="radar-stats">
               <div class="radar-stat"><b>${UI.fmtNum(v.views)}</b>播放</div>
@@ -154,13 +155,12 @@ window.Modules.radar = {
           </div>
         </div>
 
-        <!-- AI拆解模板 -->
         <div class="radar-ai-breakdown">
-          <div class="ai-breakdown-label">✦ AI 拆解模板</div>
+          <div class="ai-breakdown-label">\u2726 AI 拆解模板</div>
           <div class="ai-breakdown-grid">
             <div class="ai-bd-item">
               <div class="ai-bd-key">为什么爆</div>
-              <div class="ai-bd-val">${(v.reasons || []).map(r => UI.esc(r)).join('；')}</div>
+              <div class="ai-bd-val">${(v.reasons || []).map(r => UI.esc(r)).join('\uff1b')}</div>
             </div>
             <div class="ai-bd-item">
               <div class="ai-bd-key">情绪点</div>
@@ -173,8 +173,8 @@ window.Modules.radar = {
             <div class="ai-bd-item">
               <div class="ai-bd-key">我的改编</div>
               <div class="ai-bd-val">
-                <input type="text" class="form-input" style="font-size:12px;padding:6px 10px" 
-                  placeholder="写下你的改编思路…" 
+                <input type="text" class="form-input" style="font-size:12px;padding:6px 10px"
+                  placeholder="写下你的改编思路\u2026"
                   value="${UI.esc(v.myAdaptation || '')}"
                   onchange="Modules.radar.saveAdaptation('${v.id}', this.value)">
               </div>
@@ -182,9 +182,8 @@ window.Modules.radar = {
           </div>
         </div>
 
-        <!-- 二创方案 -->
         <div class="radar-recreate">
-          <div class="recreate-label">✦ AI 二创方案 · 我的版本</div>
+          <div class="recreate-label">\u2726 AI 二创方案 \u00b7 我的版本</div>
           <div class="recreate-block">
             <div class="recreate-key">改编标题</div>
             <div class="recreate-val title">${UI.esc(v.recreate.title)}</div>
@@ -231,6 +230,6 @@ window.Modules.radar = {
       }));
     });
     this.renderList(Store.get().radar);
-    UI.toast('雷达已刷新 ◎');
+    UI.toast('雷达已刷新 \u25ce');
   },
 };
