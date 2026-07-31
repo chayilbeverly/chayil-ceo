@@ -2557,6 +2557,8 @@ ul { list-style: none; }
   transition: all 0.2s ease;
   border: 1px solid transparent;
   -webkit-tap-highlight-color: transparent;
+  cursor: pointer;
+  user-select: none;
 }
 .keyword-chip:hover {
   background: var(--bg-hover);
