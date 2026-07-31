@@ -18,13 +18,23 @@
 window.Modules = window.Modules || {};
 
 /* ============================================
-   智能 App 唤起系统
-   支持：iOS Safari · Android Chrome · 微信内置浏览器 · 各厂商浏览器
+   智能 App 唤起系统 v4
+   核心原则：iOS Universal Link 必须通过真实 <a> 标签点击触发
+   不能使用 button + onclick → a.click()（iOS 不视为用户手势）
+
+   策略：
+   - iOS：真实 <a href="..."> 标签，用户点击自然触发 Universal Link
+   - Android：拦截 onclick，用 intent URL 强制唤起 App
+   - PWA（iOS 独立窗口）：window.open 打开 Safari 再触发
+   - 桌面端：window.open 打开网页版
+   - 微信/微博：提示用浏览器打开
    ============================================ */
 
 // 检测设备和浏览器类型
 function detectEnv() {
   var ua = navigator.userAgent || '';
+  var isStandalone = (typeof navigator !== 'undefined' && navigator.standalone) ||
+                     (typeof window !== 'undefined' && window.matchMedia('(display-mode: standalone)').matches);
   return {
     isMobile: /iPhone|iPad|iPod|Android/i.test(ua),
     isIOS: /iPhone|iPad|iPod/i.test(ua),
@@ -32,6 +42,7 @@ function detectEnv() {
     isWeChat: /MicroMessenger/i.test(ua),
     isWeibo: /Weibo/i.test(ua),
     isQQ: /QQ\//i.test(ua) && !/MicroMessenger/i.test(ua),
+    isStandalone: isStandalone,
   };
 }
 
@@ -66,147 +77,71 @@ function dyURLs(keyword) {
 }
 
 /**
- * 核心：多层 App 唤起
- * 
- * 策略：
- * - iOS Safari: Universal Link → Scheme → Web
- * - Android Chrome: Intent → Universal Link → Web
- * - 微信/微博: 提示用浏览器打开
- * - 桌面端: 直接打开网页版
+ * 追踪点击（本地存储）
  */
-function smartOpen(urls, platformName, keyword) {
-  var env = detectEnv();
-
-  // 记录点击
+function trackClick(platformName, keyword) {
   try {
     var clicks = JSON.parse(localStorage.getItem('chayil_clicks') || '[]');
     clicks.push({ platform: platformName, keyword: keyword, time: Date.now() });
     if (clicks.length > 100) clicks = clicks.slice(-100);
     localStorage.setItem('chayil_clicks', JSON.stringify(clicks));
   } catch (e) {}
-
-  // === 桌面端 ===
-  if (!env.isMobile) {
-    // 桌面端无法唤起 App，打开网页版 + 提示
-    window.open(urls.web, '_blank');
-    showMobileTip(platformName);
-    return;
-  }
-
-  // === 移动端 ===
-
-  // 微信/微博内置浏览器：无法直接唤起 App
-  if (env.isWeChat || env.isWeibo) {
-    showWeChatTip(platformName, urls.universal);
-    return;
-  }
-
-  // === Android ===
-  if (env.isAndroid) {
-    // Android 优先使用 Intent URL（最强 App 唤起方式）
-    tryOpenIntent(urls.intent, urls.universal, urls.web, platformName);
-    return;
-  }
-
-  // === iOS ===
-  if (env.isIOS) {
-    // iOS 使用 Universal Link
-    tryOpenUniversal(urls.universal, urls.scheme, urls.web, platformName);
-    return;
-  }
-
-  // 兜底
-  window.open(urls.web, '_blank');
 }
 
 /**
- * Android Intent URL 方式
+ * Android 专用：通过 Intent URL 唤起 App
+ * 在 <a> 标签的 onclick 中调用，返回 false 阻止默认跳转
  */
-function tryOpenIntent(intentUrl, universalUrl, webUrl, platformName) {
-  var startTime = Date.now();
+function androidOpen(urls, platformName, keyword) {
+  trackClick(platformName, keyword);
+
+  // 监听页面失焦（App 被唤起）
   var appOpened = false;
-
-  // 监听页面失焦/隐藏（App 被唤起）
-  var onHide = function() {
-    appOpened = true;
-    cleanup();
-  };
+  var onHide = function() { appOpened = true; cleanup(); };
   document.addEventListener('visibilitychange', onHide, { once: true });
-  document.addEventListener('pagehide', onHide, { once: true });
-
   var cleanup = function() {
     document.removeEventListener('visibilitychange', onHide);
-    document.removeEventListener('pagehide', onHide);
-    clearTimeout(fallbackTimer);
+    clearTimeout(fb);
   };
 
-  // 2.5秒后如果还在当前页面，说明 Intent 失败，用 Universal Link 兜底
-  var fallbackTimer = setTimeout(function() {
+  // 3 秒后仍在页面 → 回退到网页版
+  var fb = setTimeout(function() {
     if (!appOpened && !document.hidden) {
       cleanup();
-      tryOpenUniversal(universalUrl, null, webUrl, platformName);
+      window.location.href = urls.universal;
     }
-  }, 2500);
+  }, 3000);
 
-  // 尝试 Intent URL
-  try {
-    window.location.href = intentUrl;
-  } catch (e) {
-    cleanup();
-    window.open(webUrl, '_blank');
-  }
+  // 直接跳转 Intent URL
+  window.location.href = urls.intent;
+  return false;
 }
 
 /**
- * iOS Universal Link 方式
+ * iOS PWA（独立窗口模式）：不能直接用 <a> 标签（会被 PWA 拦截）
+ * 必须用 window.open 跳出到 Safari
  */
-function tryOpenUniversal(universalUrl, schemeUrl, webUrl, platformName) {
-  var startTime = Date.now();
-  var appOpened = false;
+function pwaOpen(url, platformName, keyword) {
+  trackClick(platformName, keyword);
+  window.open(url, '_blank');
+  return false;
+}
 
-  var onHide = function() {
-    appOpened = true;
-    cleanup();
-  };
-  document.addEventListener('visibilitychange', onHide, { once: true });
+/**
+ * 桌面端：打开网页版
+ */
+function desktopOpen(url, platformName, keyword) {
+  trackClick(platformName, keyword);
+  window.open(url, '_blank');
+  return false;
+}
 
-  var cleanup = function() {
-    document.removeEventListener('visibilitychange', onHide);
-    clearTimeout(fallbackTimer);
-  };
-
-  // 1.5秒后尝试自定义 Scheme 兜底
-  var fallbackTimer = setTimeout(function() {
-    if (!appOpened && !document.hidden) {
-      if (schemeUrl) {
-        try {
-          window.location.href = schemeUrl;
-        } catch (e) {}
-        // 再等 1 秒
-        var schemeTimer = setTimeout(function() {
-          if (!document.hidden) {
-            cleanup();
-            window.open(webUrl, '_blank');
-          }
-        }, 1000);
-      } else {
-        cleanup();
-        window.open(webUrl, '_blank');
-      }
-    }
-  }, 1500);
-
-  // 用 a 标签触发（比 window.location 更可靠）
-  var a = document.createElement('a');
-  a.href = universalUrl;
-  a.target = '_self';
-  a.rel = 'noopener';
-  a.style.display = 'none';
-  document.body.appendChild(a);
-  a.click();
-  setTimeout(function() {
-    if (a.parentNode) document.body.removeChild(a);
-  }, 100);
+/**
+ * 微信/微博内置浏览器：弹出引导
+ */
+function wechatOpen(url, platformName) {
+  showWeChatTip(platformName, url);
+  return false;
 }
 
 /**
@@ -250,6 +185,43 @@ function showMobileTip(platformName) {
     + '<div style="font-size:13px;color:var(--ink-500);margin-bottom:16px;line-height:1.6">' + platformName + ' 的内容需要在手机 App 中查看。<br>用手机访问此网站，点击卡片即可唤起 App。</div>'
     + '<button onclick="document.getElementById(\'chayilTip\').remove()" style="display:block;margin:0 auto;padding:6px 16px;background:none;border:none;color:var(--ink-400);font-size:13px;cursor:pointer">我知道了</button>';
   setTimeout(function() { if (tip.parentNode) tip.remove(); }, 6000);
+}
+
+/* ============================================
+   链接属性生成器 — 核心：根据平台返回最佳跳转策略
+   
+   iOS 非 PWA：纯 href，不拦截 onclick
+     → 用户点击 <a> → iOS 系统拦截 Universal Link → 唤起 App ✓
+   iOS PWA：window.open(_blank) 跳出到 Safari
+     → PWA 会吃掉所有导航，只能用 window.open 逃逸
+   Android：onclick 拦截，用 Intent URL 强制唤起
+   Desktop：window.open 网页版
+   微信/微博：弹窗引导
+   ============================================ */
+function buildLinkAttrs(urls, platformName, keyword, env) {
+  // 微信/微博内置浏览器
+  if (env.isWeChat || env.isWeibo) {
+    return ' href="' + urls.universal + '" onclick="return wechatOpen(\'' + urls.universal + '\',\'' + platformName + '\')" target="_blank" rel="noopener"';
+  }
+
+  // iOS PWA（独立窗口模式，会拦截所有内部导航）
+  if (env.isIOS && env.isStandalone) {
+    return ' href="' + urls.universal + '" onclick="return pwaOpen(\'' + urls.universal + '\',\'' + platformName + '\',\'' + keyword + '\')" target="_blank" rel="noopener"';
+  }
+
+  // iOS 非 PWA：纯原生 <a> 标签，不拦截 onclick！
+  // iOS 系统会自动拦截 Universal Link → 唤起 App
+  if (env.isIOS) {
+    return ' href="' + urls.universal + '" onclick="trackClick(\'' + platformName + '\',\'' + keyword + '\')" rel="noopener"';
+  }
+
+  // Android：拦截 onclick，用 Intent URL 强制唤起
+  if (env.isAndroid) {
+    return ' href="' + urls.universal + '" onclick="return androidOpen(' + JSON.stringify(urls) + ',\'' + platformName + '\',\'' + keyword + '\')" target="_blank" rel="noopener"';
+  }
+
+  // 桌面端：window.open 网页版
+  return ' href="' + urls.web + '" onclick="return desktopOpen(\'' + urls.web + '\',\'' + platformName + '\',\'' + keyword + '\')" target="_blank" rel="noopener"';
 }
 
 /* ============================================
@@ -366,38 +338,37 @@ window.Modules.inspiration = {
     grid.innerHTML = list.map(function(t, i) {
       var catColor = self.getCategoryColor(t.category);
       var mainKW = t.keywords[0];
-      
+
       var xhsU = xhsURLs(mainKW);
       var dyU = dyURLs(mainKW);
 
-      // 移动端：onclick 触发多层 App 唤起
-      // 桌面端：直接打开网页版
-      var xhsClick = env.isMobile
-        ? "smartOpen(" + JSON.stringify(xhsU) + ",'小红书','" + mainKW.replace(/'/g, "\\'") + "')"
-        : "window.open('" + xhsU.web + "','_blank')";
-      var dyClick = env.isMobile
-        ? "smartOpen(" + JSON.stringify(dyU) + ",'抖音','" + mainKW.replace(/'/g, "\\'") + "')"
-        : "window.open('" + dyU.web + "','_blank')";
+      // === 根据平台生成不同的链接行为 ===
+      // iOS 非 PWA：纯 <a href> 标签，不拦载，用户点击自然触发 Universal Link
+      // iOS PWA：window.open 跳出到 Safari
+      // Android：onclick 拦截，用 Intent URL 唤起
+      // 桌面端：window.open 打开网页版
+      // 微信/微博：弹窗引导
+
+      var xhsAttr = buildLinkAttrs(xhsU, '小红书', mainKW, env);
+      var dyAttr = buildLinkAttrs(dyU, '抖音', mainKW, env);
 
       var platformBtns = ''
-        + '<button class="platform-link p-xhs" onclick="' + xhsClick + ';return false;">'
+        + '<a class="platform-link p-xhs"' + xhsAttr + '>'
         + '  <span class="platform-icon">📕</span>'
         + '  <span class="platform-name">小红书</span>'
         + '  <span class="platform-action">打开查看笔记 →</span>'
-        + '</button>'
-        + '<button class="platform-link p-dy" onclick="' + dyClick + ';return false;">'
+        + '</a>'
+        + '<a class="platform-link p-dy"' + dyAttr + '>'
         + '  <span class="platform-icon">🎬</span>'
         + '  <span class="platform-name">抖音</span>'
         + '  <span class="platform-action">打开查看视频 →</span>'
-        + '</button>';
+        + '</a>';
 
-      // 备用关键词
+      // 备用关键词（同样使用 a 标签）
       var altKeywords = t.keywords.slice(1).map(function(k) {
         var altXhs = xhsURLs(k);
-        var altClick = env.isMobile
-          ? "smartOpen(" + JSON.stringify(altXhs) + ",'小红书','" + k.replace(/'/g, "\\'") + "')"
-          : "window.open('" + altXhs.web + "','_blank')";
-        return '<span class="keyword-chip" onclick="' + altClick + ';return false;" title="小红书搜索: ' + UI.esc(k) + '">' + UI.esc(k) + '</span>';
+        var altAttr = buildLinkAttrs(altXhs, '小红书', k, env);
+        return '<a class="keyword-chip"' + altAttr + ' title="小红书搜索: ' + UI.esc(k) + '">' + UI.esc(k) + '</a>';
       }).join('');
 
       return ''
